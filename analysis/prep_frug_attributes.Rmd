@@ -1,0 +1,201 @@
+---
+title: "Generate frugivore attributes"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+```
+
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(tidylog)
+library(magrittr)
+```
+
+
+Load networks:
+
+```{r}
+nets_names <- list.files(path = here("networks/standardized/"), pattern = "_int")
+
+nets <- list()
+
+for (i in 1:length(nets_names)){
+  net_file <- paste0("networks/standardized/", nets_names[[i]])
+  net <- read.csv(here(net_file))
+  
+  if(ncol(net)<2){
+    net <- read.csv(here(net_file), sep = ";") 
+  } else
+  {}  
+
+  net %<>% column_to_rownames("ind")
+  nets[[i]] <- net
+  names(nets)[i] <- nets_names[[i]]
+}
+```
+
+Calculate aggregated interactions by bird species and define core birds:
+
+```{r}
+frug.cons <- data.frame()
+
+for (i in 1:length(nets_names)){
+  tmp <- nets[[i]] %>% 
+    rownames_to_column("ind") %>% 
+    melt() %>%
+    mutate(net_id = names(nets[i]),
+           net_id = str_sub(net_id, 3, 7)) %>%
+    filter(value!= 0) %>%
+    group_by(net_id) %>% 
+    mutate(n_ind = n_distinct(ind)) %>%
+    group_by(net_id, variable) %>% 
+    summarise(ints = sum(value),
+              n_ind = first(n_ind),
+              n_plants_int = n_distinct(ind)) %>%
+    mutate(per.plants = n_plants_int/n_ind)
+  
+  frug.cons <- rbind(frug.cons, tmp)
+}
+
+glimpse(frug.cons)
+```
+
+Add network information
+
+```{r}
+ind.level.df <- read.csv(here("data/node.level.selection.csv"))
+
+net_info <- ind.level.df %>% 
+  distinct(net_id, net_name, plant_sp, pop, continent, country, plant_plot_rank)
+
+head(net_info)
+
+frug.cons %<>% left_join(net_info) %>%
+  rename(frug_sp = variable)
+
+glimpse(frug.cons)
+```
+
+Number of unique animal species:
+
+```{r}
+length(unique(frug.cons$frug_sp)) #246 frugivore species
+```
+
+Get frugivores body mass:
+
+```{r}
+elton.bird <- readr::read_delim(here("data/animal_traits/BirdFuncDat.txt"), delim = "\t") %>% 
+  dplyr::select(frug_sp_elton = Scientific, family = BLFamilyLatin, bmass.elton = `BodyMass-Value`) %>%
+  mutate(class = "bird")
+
+elton.mam <- readr::read_delim(here("data/animal_traits/MamFuncDat.txt"), delim = "\t") %>% 
+  dplyr::select(frug_sp_elton = Scientific, family = MSWFamilyLatin, bmass.elton = `BodyMass-Value`) %>%
+  mutate(class = "mammal")
+
+elton <- rbind(elton.bird, elton.mam)
+
+head(elton)
+```
+
+
+```{r}
+frugs <- frug.cons %>% 
+  mutate(frug_sp_original = str_replace_all(frug_sp, "_", " ")) %>%
+  ungroup() %>% distinct(frug_sp_original) %>%
+  mutate(frug_sp_elton = frug_sp_original) %>%
+  mutate(frug_sp_elton = ifelse(frug_sp_elton == "Cyanistes caeruleus", "Parus caeruleus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Cyanopica cooki", "Cyanopica cyanus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Saxicola rubicola", "Saxicola torquatus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Chloris chloris", "Carduelis chloris", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Aburria jacutinga", "Pipile jacutinga", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Curruca melanocephala", "Sylvia melanocephala", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Curruca communis", "Sylvia communis", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Curruca conspicillata", "Sylvia conspicillata", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Curruca hortensis", "Sylvia hortensis", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Curruca iberiae", "Sylvia cantillans", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Curruca undata", "Sylvia undata", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Regulus ignicapillus", "Regulus ignicapilla", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Dixiphia pipra", "Pipra pipra", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Dixiphia rubrocapilla", "Pipra rubrocapilla", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Ceratopipra rubrocapilla", "Pipra rubrocapilla", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Machaeroptus regulus", "Machaeropterus regulus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Pipraidea bonariensis", "Thraupis bonariensis", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Gennetta genetta", "Genetta genetta", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Microspingus melanoleucus", "Poospiza melanoleuca", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Thectocercus acuticaudata", "Aratinga acuticaudata", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Cyclaris gujanensis", "Cyclarhis gujanensis", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Rubigula gularis", "Pycnonotus melanicterus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Psilopogon viridis", "Megalaima viridis", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Gracula indica", "Gracula religiosa", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Tangara brasiliensis", "Tangara mexicana", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Pteroglossus erythropygius", "Pteroglossus torquatus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Lanio cristatus", "Tachyphonus cristatus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Setophaga pitiayumi", "Parula pitiayumi", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Spilopelia senegalensis", "Stigmatopelia senegalensis", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Spilopelia chinensis", "Stigmatopelia chinensis", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Cinnyris asiaticus", "Nectarinia asiatica", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Leptocoma zeylonica", "Nectarinia zeylonica", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Saltatricula atricollis", "Saltator atricollis", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Semnopithecus johnii", "Trachypithecus johnii", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Turdus simillimus", "Turdus merula", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Oriolus kundoo", "Oriolus oriolus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Geokichla citrina", "Zoothera citrina", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Hypsipetes ganeesa", "Hypsipetes leucocephalus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Sturnia blythii", "Sturnus malabaricus", frug_sp_elton)) %>% 
+  mutate(frug_sp_elton = ifelse(frug_sp_elton == "Rattus sp", "Rattus rattus", frug_sp_elton), #Doñana most common
+         frug_sp_elton = ifelse(frug_sp_elton == "Ramphastos sp", "Ramphastos brevis", frug_sp_elton)) %>% #following Lamperty most observed species
+  ungroup() %>% 
+  left_join(elton, by = "frug_sp_elton") %>%
+  mutate(bmass = ifelse(frug_sp_elton == "Tupinambis rufescens", 10000, bmass.elton),
+         bmass = ifelse(frug_sp_elton == "Leontocebus nigrifrons", 420, bmass),
+         bmass = ifelse(frug_sp_elton == "Psammodromus algirus", 11, bmass), #doi:10.1016/j.anbehav.2003.06.008
+         #elton %>% filter(grepl("Amazilia", frug_sp_elton)) %>% summarise(mean(bmass.elton))
+         bmass = ifelse(frug_sp_elton == "Amazilia sp", 4.66, bmass),
+         #elton %>% filter(grepl("Euphonia", frug_sp_elton)) %>% summarise(mean(bmass.elton))
+         bmass = ifelse(frug_sp_elton == "Euphonia sp", 13.3, bmass),
+         bmass = ifelse(frug_sp_elton == "Pipreola sp", 50, bmass),
+         #bmass = ifelse(frug_sp_elton == "Rodentia sp", NA, bmass),
+         bmass = ifelse(frug_sp_elton == "Dacnis sp.", 13.5, bmass)
+         ) %>% #mean D. cayana and D. nigripes
+  mutate(class = ifelse(frug_sp_elton == "Tupinambis rufescens", "reptile", class),
+         class = ifelse(frug_sp_elton == "Leontocebus nigrifrons", "mammal", class),
+         class = ifelse(frug_sp_elton == "Psammodromus algirus", "reptile", class),
+         class = ifelse(frug_sp_elton == "Dacnis sp.", "bird", class),
+         class = ifelse(frug_sp_elton == "Amazilia sp", "bird", class),
+         class = ifelse(frug_sp_elton == "Euphonia sp", "bird", class),
+         class = ifelse(frug_sp_elton == "Pipreola sp", "bird", class),
+         class = ifelse(frug_sp_elton == "Rodentia sp", "mammal", class),
+         class = ifelse(frug_sp_elton == "Rattus sp", "mammal", class)) %>%
+  arrange(family)
+
+glimpse(frugs)
+
+write_csv(frugs, here("data/animal_traits/frugivores_bmass.csv"))
+
+#frugivores with no body mass info:
+frugs %>% 
+  filter(is.na(bmass)) %>%
+  distinct(frug_sp_original)
+```
+
+
+Save more complete dataset with interaction data:
+
+```{r}
+frug.cons.full <- frug.cons %>%
+  mutate(frug_sp_original = str_replace_all(frug_sp, "_", " ")) %>%
+  left_join(frugs, by = "frug_sp_original")
+
+glimpse(frug.cons.full)
+
+write_csv(frug.cons.full, here("data/frugivores_interactions.csv"))
+```
+
