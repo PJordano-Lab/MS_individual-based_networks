@@ -175,13 +175,13 @@ full_ref_table
 # 2. Node level
 
 ```{r}
-ind.level.df <- read.csv(here("metrics/ind.level.df.csv"))
+ind.level.df <- read.csv(here("data/ind.level.df.csv"))
 ```
 
 Load ind networks characteristics:
 
 ```{r }
-ind_nets_char <- readxl::read_xlsx(here("selected_individual_networks.xlsx"))
+ind_nets_char <- readxl::read_xlsx(here("data/selected_individual_networks.xlsx"))
 
 ind_nets_ID <- ind_nets_char %>%
   dplyr::select(net_id = code_ID,
@@ -195,7 +195,7 @@ ind_nets_ID <- ind_nets_char %>%
 Load net colors:
 
 ```{r, message=FALSE}
-net_cols <- read_csv(here("metrics/net_colors.csv")) %>%
+net_cols <- read_csv(here("data/net_colors.csv")) %>%
   dplyr::select(continent, country, plant_sp, plant_plot_rank, 
                 cols_continent3, cols_continent4)
 ```
@@ -222,7 +222,7 @@ glimpse(ind.level.selec)
 ```
 
 ```{r}
-write_csv(ind.level.selec, here("metrics/node.level.selection.csv"))
+write_csv(ind.level.selec, here("data/node.level.selection.csv"))
 ```
 
 
@@ -247,5 +247,5 @@ full_ref_table2 <- net.level.selection %>%
 
 glimpse(full_ref_table2)
 
-write.csv(full_ref_table2, here("tables/study_list.csv"))
+#write.csv(full_ref_table2, here("tables/study_list.csv"))
 ```
