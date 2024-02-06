@@ -1,0 +1,110 @@
+---
+title: "Sampling effort overview"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r eval = F}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(reshape2)
+library(patchwork)
+library(ggalt)
+
+theme_set(theme_minimal())
+```
+
+
+Read all attribute datasets
+
+```{r}
+#Read list of names
+nets_names <- list.files(path = here("networks/"), pattern = "_attr")
+
+#Create empty list
+sampling_eff <- list()
+
+#Add all read files to the list
+for (i in 1:length(nets_names)){
+  net_file <- paste0("networks/", nets_names[[i]])
+  net <- read.csv(here(net_file))
+  
+  if(ncol(net)<2){
+    net <- read.csv(here(net_file), sep = ";") #For those datasets saved with ; separation
+  } else
+  {}  
+  
+  net %<>% 
+    select(ind, starts_with("se_")) %>% #select only sampling effort variables
+    mutate(ind = as.character(ind))
+  
+  sampling_eff[[i]] <- net #add to list
+  names(sampling_eff)[i] <- nets_names[[i]] #name the list
+
+  # assign(nets_names[[i]], net)
+}
+```
+
+Read nets characteristics (name, site etc...)
+```{r}
+nets_char <- readxl::read_xlsx(here("data/selected_individual_networks.xlsx"))
+
+nets_ID <- nets_char %>%
+  select(code = code_ID,
+         ref,
+         plant_sp = `focus species`,
+         pop = pop_site) %>%
+  mutate(net_name = paste0(plant_sp, "_", pop))
+```
+
+
+```{r, message=F}
+samp.eff.melt <- melt(sampling_eff) %>%
+  filter(variable != "se_bc_area") %>% #non interesting sampling effort (mostly always equal)
+  mutate(study_n = str_sub(L1, 1,2), #extract study number
+         subnet_n = str_sub(L1, 4,5)) %>% #extract net number within study
+  group_by(study_n, subnet_n) %>%
+  mutate(code = paste0(study_n, "_", subnet_n),
+         net_n = cur_group_id()) %>% #create a net number name based on study and subnet
+  left_join(nets_ID) 
+```
+
+
+```{r sampling_cols}
+studies <- unique(samp.eff.melt$study_n)
+
+for (i in 1:length(studies)) {
+  
+  study_to_plot <- samp.eff.melt %>%
+    filter(study_n == studies[[i]])
+  
+  title_net <- paste0(unique(study_to_plot$ref),
+                        " - study #", 
+                      unique(study_to_plot$study_n))
+  
+  plot <- ggplot(study_to_plot, aes(x = ind, y = value)) + 
+    geom_col(color = "grey30", fill = "grey70") + 
+    facet_grid(variable~net_name, scales = "free") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+          plot.title = element_text(hjust = 0.5),
+          strip.text.x = element_text(face = "italic")) +
+    labs(title = title_net, x = NULL, y = NULL)
+  
+  print(plot)
+  
+  assign(paste0("se_plot_", studies[[i]]), plot)
+  # name <- paste0("se_plot_", studies[[i]], ".csv")
+  # ggsave(here(name))
+}
+```
+
+
+
+
