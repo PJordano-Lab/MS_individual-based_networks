@@ -41,5 +41,3 @@ render("analysis/PCA_3d_plot.Rmd")
 # Analysis individual specialization:
 render("analysis/ind_specialization.Rmd")
 
-
-
