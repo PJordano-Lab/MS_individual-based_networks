@@ -1,0 +1,283 @@
+---
+title: "Network selection and dataset preparation"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+always_allow_html: true
+---
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(magrittr)
+library(tidylog)
+
+theme_set(theme_minimal())
+```
+
+# 1. Network level
+
+Load ind-sp data:
+
+```{r}
+net.level.ind <- read.csv(here("metrics/net.level.df.csv")) %>%
+  rename(niche.overlap.horn.HL = niche.overlap.HL) %>%
+  rename(niche.overlap.horn.LL = niche.overlap.LL)
+
+mod.ind <- read.csv(here("metrics/modularity_estimation_gts.csv")) %>%
+  rename(net_id = network) %>%
+  mutate(net_id = str_sub(net_id, 3, 7)) %>% 
+  dplyr::select(-X)
+
+net.level.ind %<>% left_join(mod.ind, by = "net_id") %>%
+  relocate(M, .after = weighted.NODF) %>%
+  mutate(type = "ind")
+```
+
+Load sp-sp data:
+
+```{r}
+net.level.sp <- read.csv(here("metrics/net.level.df.sp.csv")) %>%
+  mutate(net_id = str_sub(net_id, 6, 10)) %>%
+  rename(niche.overlap.horn.HL = niche.overlap.HL) %>%
+  rename(niche.overlap.horn.LL = niche.overlap.LL)
+
+mod.sp <- read.csv(here("metrics/modularity_estimation_gts_sp.csv")) %>%
+  rename(net_id = network) %>%
+  mutate(net_id = str_sub(net_id, 6, 10)) %>% 
+  dplyr::select(-X)
+
+net.level.sp %<>% left_join(mod.sp, by = "net_id") %>%
+  relocate(M, .after = weighted.NODF) %>%
+  mutate(type = "sp")
+```
+
+Load dissasortativity and centrality metrics:
+
+```{r}
+igraph.metrics <- read.csv(here("metrics/igraph_metrics.csv")) %>%
+  mutate(net_code = paste0(type, "_", net_id)) %>%
+  dplyr::select(-c(X, net_id))
+```
+
+Load net characteristics:
+
+```{r}
+all_nets_char <- readxl::read_xlsx(here("selected_networks.xlsx")) %>%
+  mutate(net_code = paste0(type, "_", code_ID))
+
+nets_char <- all_nets_char %>%
+  dplyr::select(net_code, type, code_ID, ref, bioregion, country, plant_sp)
+
+#glimpse(nets_char)
+```
+
+Merge all datasets:
+
+```{r}
+net.level <- full_join(net.level.ind, net.level.sp) %>%
+  mutate(net_code = paste0(type, "_", net_id)) %>%
+  left_join(igraph.metrics) %>%
+  mutate(unique.ints = connectance * net_size) %>% 
+  left_join(nets_char)
+  
+#glimpse(net.level)
+```
+
+
+Distribution of some network characteristics
+```{r}
+#par(mfrow = c(3,2))
+
+ggplot(net.level, aes(x = number.of.species.HL)) + 
+  geom_histogram(bins = 50) + 
+  labs(x = "No. FRUGIVORES", y = NULL) +
+  facet_wrap(~type, scales = "free")
+
+ggplot(net.level, aes(x = number.of.species.LL)) + 
+  geom_histogram(bins = 50) + 
+  labs(x = "No. PLANTS", y = NULL) +
+  facet_wrap(~type, scales = "free")
+
+ggplot(net.level, aes(x = number.of.species.HL + number.of.species.LL,)) + 
+  geom_histogram(bins = 50) +  
+  labs(x = "No. UNIQUE INTERACTIONS", y = NULL) +
+  geom_vline(xintercept = 16, linetype = "dashed", color = "red") +
+  facet_wrap(~type, scales = "free")
+
+ggplot(net.level, aes(x = net_size)) + 
+  geom_histogram(bins = 50) + 
+  labs(x = "NETWORK SIZE (No. CELLS)", y = NULL) +
+  geom_vline(xintercept = 50, linetype = "dashed", color = "red") +
+  facet_wrap(~type, scales = "free")
+
+ggplot(net.level, aes(x = unique.ints)) + 
+  geom_histogram(bins = 50) +  
+  labs(x = "No. UNIQUE INTERACTIONS", y = NULL) +
+  geom_vline(xintercept = 20, linetype = "dashed", color = "red") +
+  facet_wrap(~type, scales = "free")
+```
+
+```{r}
+net.level %>% 
+  #filter(type == "sp") %>%
+  select(type, plant_sp, net_id, plant_sp, 
+         number.of.species.HL, number.of.species.LL,
+         net_size, unique.ints) %>%
+  mutate(n_nodes = number.of.species.HL + number.of.species.LL) %>%
+  arrange(n_nodes) %>%
+  filter(n_nodes > 15) %>% 
+  #count(as.factor(type)) %>%
+  summary()
+```
+
+Remove small nets:
+
+```{r}
+net.level.selection <- net.level %>%
+  mutate(n_nodes = number.of.species.HL + number.of.species.LL) %>%
+  filter(n_nodes > 15)
+
+removed_nets <- setdiff(net.level$net_code, net.level.selection$net_code)
+removed_nets
+```
+
+11 nets removed (4 ind-sp, 7 sp-sp)
+"ind_08_01" "ind_12_01" "ind_12_06" "ind_12_07"
+"sp_03_01"  "sp_03_02"  "sp_03_03"  "sp_03_04" "sp_05_01"  "sp_31_01"  "sp_44_01" 
+
+```{r}
+net.level.selection %<>% 
+  arrange(type, net_id) %>%
+  mutate(net_n = order(net_code)) %>%
+  mutate(study = str_sub(net_id, 1,2),
+         study = paste0(type, "_", study))
+
+glimpse(net.level.selection)
+```
+
+```{r}
+write_csv(net.level.selection, here("metrics/net.level.selection.csv"))
+```
+
+Tables:
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+table <- net.level.selection %>%
+  dplyr::select(net_n, type, net_code, ref, net_size,
+                n_plants = number.of.species.LL,
+                n_frugivores = number.of.species.HL) %>%
+  kable() %>% 
+  kable_classic(font_size = 12, full_width = F)
+
+table
+
+# save_kable(table, "list_nets.html")
+# webshot::webshot("list_nets.html", "list_nets.pdf")
+```
+
+
+```{r, include=FALSE}
+full.ref <- all_nets_char %>% 
+  dplyr::select(net_code, full.ref = 'full ref')
+  
+full_ref_table <- net.level.selection %>%
+  left_join(full.ref) %>%
+  dplyr::select(net_n, type, net_code,
+                n_plants = number.of.species.LL,
+                n_frugivores = number.of.species.HL,
+                net_size, unique.ints,
+                full.ref) %>%
+  kbl() %>%
+  kable_classic(font_size = 12, full_width = F)
+
+full_ref_table
+
+# save_kable(full_ref_table, "list_nets_full_ref.html")
+# webshot::webshot("list_nets_full_ref.html", "list_nets_full_ref.pdf")
+```
+
+
+
+
+
+# 2. Node level
+
+```{r}
+ind.level.df <- read.csv(here("metrics/ind.level.df.csv"))
+```
+
+Load ind networks characteristics:
+
+```{r }
+ind_nets_char <- readxl::read_xlsx(here("selected_individual_networks.xlsx"))
+
+ind_nets_ID <- ind_nets_char %>%
+  dplyr::select(net_id = code_ID,
+         ref,
+         plant_sp = `focus species`,
+         pop = pop_site,
+         country) %>%
+  mutate(net_name = paste0(plant_sp, "_", pop))
+```
+
+Load net colors:
+
+```{r, message=FALSE}
+net_cols <- read_csv(here("metrics/net_colors.csv")) %>%
+  dplyr::select(continent, country, plant_sp, plant_plot_rank, 
+                cols_continent3, cols_continent4)
+```
+
+Add network characteristics, colors and filter small nets as above:
+
+```{r}
+ind.level.selec <- ind.level.df %>%
+  mutate(study = str_sub(net_id, 1,2)) %>%
+  left_join(ind_nets_ID) %>%
+  left_join(net_cols) %>%
+  filter(!net_id %in% c("08_01", "12_01", "12_06", "12_07")) %>%
+  group_by(net_id) %>%
+  mutate(net_n = cur_group_id()) %>%
+  mutate(ind_ID = paste0(net_id, "_", ind)) %>% #create a plant id unique name
+  relocate(net_n, .before = everything()) %>%
+  relocate(net_id, .after = net_n) %>%
+  relocate(study, .after = net_id) %>%
+  relocate(ind_ID, .after = study)
+```
+
+```{r}
+glimpse(ind.level.selec)
+```
+
+```{r}
+write_csv(ind.level.selec, here("metrics/node.level.selection.csv"))
+```
+
+
+
+```{r, include=FALSE}
+pop <- ind_nets_char %>% select(code_ID, pop_site) %>%
+  mutate(net_code = paste0("ind_", code_ID)) %>% select(-code_ID)
+
+full_ref_table2 <- net.level.selection %>%
+  left_join(all_nets_char) %>%
+  left_join(pop) %>%
+  rename(family = 'focus family',
+         full.ref = 'full ref') %>%
+  mutate(plant_sp = paste0(plant_sp, " (", family, ")")) %>%
+  dplyr::select(net_n, type, 
+                plant_sp, 
+                site, pop_site, country,
+                n_plants = number.of.species.LL,
+                n_frugivores = number.of.species.HL,
+                net_size, unique.ints,
+                full.ref) 
+
+glimpse(full_ref_table2)
+
+write.csv(full_ref_table2, here("tables/study_list.csv"))
+```
