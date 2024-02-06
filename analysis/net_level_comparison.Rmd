@@ -1,0 +1,104 @@
+---
+title: "Network-level differences in networks"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+always_allow_html: true
+---
+
+```{r include = F}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(magrittr)
+library(rcartocolor)
+library(patchwork)
+library(ggalt)
+library(psych)
+library(ggfortify)
+library(ggrepel)
+library(knitr)
+library(kableExtra)
+library(cluster)
+library(GGally)
+library(reshape2)
+library(ggcorrplot)
+library(gridExtra)
+theme_set(theme_minimal())
+```
+
+Load net-level metrics:
+
+```{r}
+net.level <- read.csv(here("data/net.level.selection.csv")) %>%
+  mutate(WC.new  = exp(Shannon.diversity)/net_size) %>%
+  mutate(type = recode(type, "ind"="ind-based", "sp"="sp-based"))
+
+glimpse(net.level)
+```
+
+
+Select only metrics of interest:
+
+```{r}
+metrics.of.interest.size <- c("connectance", 
+                         "weighted.NODF", 
+                         "M", 
+                         "Alatalo.interaction.evenness",
+                         "centralization.w",
+                         "assortativity",
+                         "net_size")
+
+#Remove net_size
+metrics.of.interest <- metrics.of.interest.size[metrics.of.interest.size != "net_size"]
+```
+
+
+## PCA for network level metrics
+
+```{r}
+pc <- prcomp(net.level[, metrics.of.interest],
+             center = TRUE,
+             scale. = TRUE)
+
+summary(pc)
+print(pc)
+
+pc.importance <- summary(pc)$importance %>% 
+  as.data.frame() %>% 
+  mutate_if(is.numeric, ~sprintf("%.2f",.))
+
+loadings <- pc$rotation %>% 
+  as.data.frame() %>% 
+  mutate_if(is.numeric, ~sprintf("%.2f",.))
+
+# write.csv(pc.importance, here("tables/PCA_nets_pc_importance.csv"))
+# write.csv(loadings, here("tables/PCA_nets_loadings.csv"))
+
+autoplot(pc,
+         data = net.level,
+         loadings = TRUE,
+         loadings.level = TRUE,
+         #frame.type = "norm",
+         loadings.label = TRUE, 
+         loadings.label.size = 3,
+         loadings.colour = "grey20",
+         loadings.label.colour = "grey20",
+         color = NA) +
+  geom_point(aes(size = net_size, color = type)) +
+  stat_ellipse(aes(color = type), type = "norm", level = 0.80) + 
+  geom_text_repel(aes(label = net_n, color = type), size = 2) +
+  #scale_color_carto_d() +
+  scale_color_manual(values = c("black", "grey50")) +
+  scale_size_continuous(breaks = c(100, 500, 1000, 1500, 2500)) + 
+  labs(size = "Network \n size", color = "Network \n type")
+
+#ggsave(here("figs/PCA_sp-sp_vs_ind-sp.pdf"), width = 7, height = 5)
+```
+
+
