@@ -1,0 +1,148 @@
+---
+title: "Calculate frugivores' contribution"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(magrittr)
+library(reshape2)
+library(ggrepel)
+library(patchwork)
+
+theme_set(theme_minimal())
+```
+
+## FRUGIVORES (aggregate data by frugivores)
+
+Load datasets:
+
+```{r}
+frug.ints <- read.csv(here("data/frugivores_interactions.csv"))
+
+ind.level.df <- read.csv(here("data/node.level.selection.csv"))
+
+#Net colors:
+mycols <- as.character(ind.level.df$cols_continent3)
+names(mycols) <- as.character(ind.level.df$plant_sp)
+
+mycols.cont <- as.character(ind.level.df$cols_continent4)
+names(mycols.cont) <- as.character(ind.level.df$continent)
+```
+
+Accumulated consumption by frugivores in the net:
+
+```{r}
+frug.accum.ints <- frug.ints %>% 
+  group_by(net_id) %>% 
+  mutate(total.ints = sum(ints),
+         rank = rank(desc(ints))) %>%
+  arrange(net_id, rank) %>%
+  mutate(order = order(rank),
+         acc_ints = cumsum(ints)) %>% #accumulation in increasing order
+  arrange(net_id, desc(order)) %>%
+  mutate(inverse_acc_ints = cumsum(ints)) %>% #accumulation in decreasing order
+  mutate(core50 = ifelse(inverse_acc_ints > 0.5, "yes", "no"))
+
+glimpse(frug.accum.ints)
+```
+
+How many frugivores in the net represent >50% of consumption?
+
+```{r}
+d1 <- frug.accum.ints %>%
+  group_by(net_id, core50) %>%
+  summarise(n=n()) %>%
+  pivot_wider(names_from = "core50", values_from = "n") %>%
+  mutate(per.core.frug = yes/(yes+no))
+
+summary(d1$per.core.frug)
+sd(d1$per.core.frug)
+hist(d1$per.core.frug)
+```
+
+De media menos del 20% (18.6%) de los frugivores realizan más de la mitad de las interacciones/visitas (rango: min = 2% - 50%)
+
+
+Calculate bodymass value relative to each network (study site):
+
+```{r}
+frug.accum.ints %<>% group_by(net_id) %>%
+  mutate(bmass.scaled = scale(bmass))
+
+hist(frug.accum.ints$bmass.scaled)
+```
+
+
+Plot accumulation of interactions:
+
+```{r fig.width=8, fig.height=9}
+frug.accum.ints %>%
+  filter(!net_id %in% c("08_01", "12_01", "12_06", "12_07")) %>%
+  ggplot(aes(x = order, y = ints, group = net_id)) + 
+  geom_line(color = "grey70") +
+  geom_point(aes(fill = plant_sp, color = core50, size = bmass.scaled), pch = 21) +
+  scale_fill_manual(values = mycols) +
+  scale_color_manual(values = c("white", "black")) +
+  facet_wrap(~fct_reorder(plant_sp, plant_plot_rank), scales = "free", ncol = 4) +
+  theme(legend.position = "none", axis.text.x = element_blank(),
+        strip.text = element_text(face = "italic"), 
+        panel.border = element_rect(linewidth = 0.2, fill = NA),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank()) +
+  labs(x = "Frugivore species ranked by contribution", y = "Contribution to total interactions")
+  #caption = "Black contour represent frugivore species that aggregated perform >50% of interactions"
+
+ggsave(here("figs/frugivore_ints_accumulated.pdf"), width = 8, height = 9)
+```
+
+
+Plot for all frugivores in the net the % of interactions it held vs. % of plants it interacted with.
+
+```{r}
+frug.accum.ints %>% 
+  filter(!net_id %in% c("08_01", "12_01", "12_06", "12_07")) %>%
+  ggplot(aes(x = ints, y = per.plants, 
+             color = continent,
+             label = frug_sp, label2 = net_id)) + 
+  geom_point(aes(size = bmass.scaled), alpha = 0.6) +
+  scale_color_manual(values = mycols.cont) +
+  scale_size_continuous(breaks = c(-1, 0, 1.5, 3, 5)) +
+  theme(panel.border = element_rect(fill = NA, linewidth = 0.5)) +
+  labs(y = "Proportion of plants in the network visited by each frugivore", 
+       x = "Frugivore's contribution to the overall interactions in the network", 
+       color = "Region", size = "Body mass \nz-score") 
+
+ggsave(here("figs/interaction_distribution_frugs.pdf"), height = 5, width = 7)
+```
+
+
+Model to test relationship:
+
+```{r}
+hist(frug.accum.ints$ints)
+hist(frug.accum.ints$per.plants)
+hist(log(frug.accum.ints$ints))
+hist(log(frug.accum.ints$per.plants))
+
+plot(log(frug.accum.ints$ints), log(frug.accum.ints$per.plants))
+
+data.model <- frug.accum.ints %>% 
+  filter(!net_id %in% c("08_01", "12_01", "12_06", "12_07")) %>%
+  mutate(net_id = as.factor(net_id)) 
+
+#simple correlations
+cor.test(data.model$ints, data.model$per.plants, method = "spearman")
+cor.test(data.model$ints, data.model$bmass.scaled, method = "spearman")
+cor.test(data.model$per.plants, data.model$bmass.scaled, method = "spearman")
+```
+
