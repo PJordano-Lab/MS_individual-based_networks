@@ -72,51 +72,7 @@ for (i in seq_along(net.test)){
 
 ```
 
-# Modularity and nestedness (NODF) calculation
-
-```{r mod.nodf}
-metric.info <- data.frame(matrix(ncol = 7, nrow = length(nets)))
-x <- c("network", "M", "z_M", "pvalue_M", "NODF", "z_NODF", "pvalue_NODF")
-colnames(metric.info) <- x
-
-total = length(nets)
-
-pb = txtProgressBar(min = 0, max = total, initial = 0, title = "Progress Bar", label="0% done", style=3) 
-
-for(i in 1:length(nets)){
-  metric.info$network[i] <- names(nets[i])
-  
-  null <- nullmodel(nets[[i]], N=100, method="vaznull") # null model  
-  
-  # modularity (M) computation
-  mod <-computeModules(nets[[i]])
-  metric.info$M[i] <- mod@likelihood
-  
-  mod.null <- sapply(null, computeModules)
-  like.null <- sapply(mod.null, function(x) x@likelihood) 
-  z.mod <- (mod@likelihood - mean(like.null))/sd(like.null)
-  metric.info$z_M[i] <- z.mod
-  
-  p.mod <- sum(like.null > mod@likelihood) / length(like.null)
-  metric.info$pvalue_M[i] <- p.mod
-
-  # nestedness (wNODF) computation
-  nodf <-networklevel(nets[[i]], index="weighted NODF")
-  metric.info$NODF[i]<- nodf
-  
-  nodf.null <- sapply(null, networklevel, index="weighted NODF")
-  z.nodf <- (nodf - mean(nodf.null))/sd(nodf.null)
-  metric.info$z_NODF[i] <- z.nodf
-  
-  p.nodf <- sum(nodf.null > nodf) / length(nodf.null)
-  metric.info$pvalue_NODF[i] <- p.nodf
-  
-  setTxtProgressBar(pb,i)
-}
-getwd()
-write.csv(metric.info, here("metrics/mod_nest_metrics.csv"))
-```
-
+# Modularity calculation
 
 ```{r}
 # only modularity without z-scores
@@ -166,5 +122,4 @@ for(i in 1:length(nets_sp)){
 
 getwd()
 write.csv(mod.info.sp, here("data/modularity_estimation_gts_sp.csv"))
-
 ```
