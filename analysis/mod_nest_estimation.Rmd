@@ -1,0 +1,170 @@
+---
+title: "Estimation of modularity and nestedness metrics"
+author: "Blanca Arroyo-Correa"
+date: "7/17/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Load packages
+
+```{r packages}
+library(bipartite)
+library(here)
+library(tidyverse)
+library(magrittr)
+```
+
+# Read data
+
+```{r read}
+
+# ind-sp
+nets_names <- list.files(path = here("networks/standardized/"), pattern = "_int")
+nets <- list()
+
+for (i in 1:length(nets_names)){
+  net_file <- paste0("networks/standardized/", nets_names[[i]])
+  net <- read.csv(here(net_file))
+  
+  if(ncol(net)<2){
+    net <- read.csv(here(net_file), sep = ";") 
+  } else
+  {}  
+
+  net %<>% column_to_rownames("ind")
+  nets[[i]] <- net #add to list
+  names(nets)[i] <- nets_names[[i]]
+
+}
+
+
+# sp-sp
+nets_names_sp <- list.files(path = here("networks/standardized/"), pattern = "stsp_")
+nets_sp <- list()
+
+for (i in 1:length(nets_names_sp)){
+  net_file <- paste0("networks/standardized/", nets_names_sp[[i]])
+  net <- read.csv(here(net_file))
+  
+  if(ncol(net)<2){
+    net <- read.csv(here(net_file), sep = ";") 
+  } else
+  {}  
+
+  net %<>% column_to_rownames("sp")
+  nets_sp[[i]] <- net #add to list
+  names(nets_sp)[i] <- nets_names_sp[[i]]
+
+}
+
+# test rounding interactions in network
+net.test <- nets[c(20)]
+for (i in seq_along(net.test)){
+  temp <- net.test[[i]]
+  temp2 <- round(temp*100,0)
+  net.test[[i]] <- temp2
+}
+
+```
+
+# Modularity and nestedness (NODF) calculation
+
+```{r mod.nodf}
+metric.info <- data.frame(matrix(ncol = 7, nrow = length(nets)))
+x <- c("network", "M", "z_M", "pvalue_M", "NODF", "z_NODF", "pvalue_NODF")
+colnames(metric.info) <- x
+
+total = length(nets)
+
+pb = txtProgressBar(min = 0, max = total, initial = 0, title = "Progress Bar", label="0% done", style=3) 
+
+for(i in 1:length(nets)){
+  metric.info$network[i] <- names(nets[i])
+  
+  null <- nullmodel(nets[[i]], N=100, method="vaznull") # null model  
+  
+  # modularity (M) computation
+  mod <-computeModules(nets[[i]])
+  metric.info$M[i] <- mod@likelihood
+  
+  mod.null <- sapply(null, computeModules)
+  like.null <- sapply(mod.null, function(x) x@likelihood) 
+  z.mod <- (mod@likelihood - mean(like.null))/sd(like.null)
+  metric.info$z_M[i] <- z.mod
+  
+  p.mod <- sum(like.null > mod@likelihood) / length(like.null)
+  metric.info$pvalue_M[i] <- p.mod
+
+  # nestedness (wNODF) computation
+  nodf <-networklevel(nets[[i]], index="weighted NODF")
+  metric.info$NODF[i]<- nodf
+  
+  nodf.null <- sapply(null, networklevel, index="weighted NODF")
+  z.nodf <- (nodf - mean(nodf.null))/sd(nodf.null)
+  metric.info$z_NODF[i] <- z.nodf
+  
+  p.nodf <- sum(nodf.null > nodf) / length(nodf.null)
+  metric.info$pvalue_NODF[i] <- p.nodf
+  
+  setTxtProgressBar(pb,i)
+}
+getwd()
+write.csv(metric.info, here("metrics/mod_nest_metrics.csv"))
+```
+
+
+```{r}
+# only modularity without z-scores
+# individual-based networks
+mod.info <- data.frame(matrix(ncol = 2, nrow = length(nets)))
+x <- c("network", "M")
+colnames(mod.info) <- x
+
+total = length(nets)
+
+pb = txtProgressBar(min = 0, max = total, initial = 0, title = "Progress Bar", label="0% done", style=3) 
+
+for(i in 1:length(nets)){
+  mod.info$network[i] <- names(nets[i])
+  
+  # modularity (M) computation
+  mod <-computeModules(nets[[i]])
+  mod.info$M[i] <- mod@likelihood
+  
+  setTxtProgressBar(pb,i)
+}
+
+
+write.csv(mod.info, here("data/modularity_estimation_gts.csv"))
+```
+
+
+```{r}
+# species-based networks
+mod.info.sp <- data.frame(matrix(ncol = 2, nrow = length(nets_sp)))
+x <- c("network", "M")
+colnames(mod.info.sp) <- x
+
+total = length(nets_sp)
+
+pb = txtProgressBar(min = 0, max = total, initial = 0, title = "Progress Bar", label="0% done", style=3) 
+
+for(i in 1:length(nets_sp)){
+  mod.info.sp$network[i] <- names(nets_sp[i])
+  
+  # modularity (M) computation
+  mod <-computeModules(nets_sp[[i]])
+  mod.info.sp$M[i] <- mod@likelihood
+  
+  setTxtProgressBar(pb,i)
+}
+
+getwd()
+write.csv(mod.info.sp, here("data/modularity_estimation_gts_sp.csv"))
+
+```
