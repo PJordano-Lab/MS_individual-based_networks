@@ -4,8 +4,6 @@ library(rmarkdown)
 
 #### DATA PREPARATION #####
 
-# See ("networks/README.md") for the explanation of variables meaning used in the "data" folder.
-
 # Each network has been standardized dividing each interaction by the total number
 # of interactions (Grand Total Standardization). All standardized interactions matrices
 # are in ("networks/standardized").
