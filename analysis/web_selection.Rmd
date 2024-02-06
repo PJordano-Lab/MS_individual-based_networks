@@ -20,11 +20,11 @@ theme_set(theme_minimal())
 Load ind-sp data:
 
 ```{r}
-net.level.ind <- read.csv(here("metrics/net.level.df.csv")) %>%
+net.level.ind <- read.csv(here("data/net.level.df.csv")) %>%
   rename(niche.overlap.horn.HL = niche.overlap.HL) %>%
   rename(niche.overlap.horn.LL = niche.overlap.LL)
 
-mod.ind <- read.csv(here("metrics/modularity_estimation_gts.csv")) %>%
+mod.ind <- read.csv(here("data/modularity_estimation_gts.csv")) %>%
   rename(net_id = network) %>%
   mutate(net_id = str_sub(net_id, 3, 7)) %>% 
   dplyr::select(-X)
@@ -37,12 +37,12 @@ net.level.ind %<>% left_join(mod.ind, by = "net_id") %>%
 Load sp-sp data:
 
 ```{r}
-net.level.sp <- read.csv(here("metrics/net.level.df.sp.csv")) %>%
+net.level.sp <- read.csv(here("data/net.level.df.sp.csv")) %>%
   mutate(net_id = str_sub(net_id, 6, 10)) %>%
   rename(niche.overlap.horn.HL = niche.overlap.HL) %>%
   rename(niche.overlap.horn.LL = niche.overlap.LL)
 
-mod.sp <- read.csv(here("metrics/modularity_estimation_gts_sp.csv")) %>%
+mod.sp <- read.csv(here("data/modularity_estimation_gts_sp.csv")) %>%
   rename(net_id = network) %>%
   mutate(net_id = str_sub(net_id, 6, 10)) %>% 
   dplyr::select(-X)
@@ -55,7 +55,7 @@ net.level.sp %<>% left_join(mod.sp, by = "net_id") %>%
 Load dissasortativity and centrality metrics:
 
 ```{r}
-igraph.metrics <- read.csv(here("metrics/igraph_metrics.csv")) %>%
+igraph.metrics <- read.csv(here("data/igraph_metrics.csv")) %>%
   mutate(net_code = paste0(type, "_", net_id)) %>%
   dplyr::select(-c(X, net_id))
 ```
@@ -63,7 +63,7 @@ igraph.metrics <- read.csv(here("metrics/igraph_metrics.csv")) %>%
 Load net characteristics:
 
 ```{r}
-all_nets_char <- readxl::read_xlsx(here("selected_networks.xlsx")) %>%
+all_nets_char <- readxl::read_xlsx(here("data/selected_networks.xlsx")) %>%
   mutate(net_code = paste0(type, "_", code_ID))
 
 nets_char <- all_nets_char %>%
@@ -84,39 +84,6 @@ net.level <- full_join(net.level.ind, net.level.sp) %>%
 #glimpse(net.level)
 ```
 
-
-Distribution of some network characteristics
-```{r}
-#par(mfrow = c(3,2))
-
-ggplot(net.level, aes(x = number.of.species.HL)) + 
-  geom_histogram(bins = 50) + 
-  labs(x = "No. FRUGIVORES", y = NULL) +
-  facet_wrap(~type, scales = "free")
-
-ggplot(net.level, aes(x = number.of.species.LL)) + 
-  geom_histogram(bins = 50) + 
-  labs(x = "No. PLANTS", y = NULL) +
-  facet_wrap(~type, scales = "free")
-
-ggplot(net.level, aes(x = number.of.species.HL + number.of.species.LL,)) + 
-  geom_histogram(bins = 50) +  
-  labs(x = "No. UNIQUE INTERACTIONS", y = NULL) +
-  geom_vline(xintercept = 16, linetype = "dashed", color = "red") +
-  facet_wrap(~type, scales = "free")
-
-ggplot(net.level, aes(x = net_size)) + 
-  geom_histogram(bins = 50) + 
-  labs(x = "NETWORK SIZE (No. CELLS)", y = NULL) +
-  geom_vline(xintercept = 50, linetype = "dashed", color = "red") +
-  facet_wrap(~type, scales = "free")
-
-ggplot(net.level, aes(x = unique.ints)) + 
-  geom_histogram(bins = 50) +  
-  labs(x = "No. UNIQUE INTERACTIONS", y = NULL) +
-  geom_vline(xintercept = 20, linetype = "dashed", color = "red") +
-  facet_wrap(~type, scales = "free")
-```
 
 ```{r}
 net.level %>% 
@@ -157,8 +124,9 @@ glimpse(net.level.selection)
 ```
 
 ```{r}
-write_csv(net.level.selection, here("metrics/net.level.selection.csv"))
+write_csv(net.level.selection, here("data/net.level.selection.csv"))
 ```
+
 
 Tables:
 
