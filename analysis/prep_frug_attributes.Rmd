@@ -92,11 +92,11 @@ length(unique(frug.cons$frug_sp)) #246 frugivore species
 Get frugivores body mass:
 
 ```{r}
-elton.bird <- readr::read_delim(here("data/animal_traits/BirdFuncDat.txt"), delim = "\t") %>% 
+elton.bird <- readr::read_delim(here("data/animal_elton_traits/BirdFuncDat.txt"), delim = "\t") %>% 
   dplyr::select(frug_sp_elton = Scientific, family = BLFamilyLatin, bmass.elton = `BodyMass-Value`) %>%
   mutate(class = "bird")
 
-elton.mam <- readr::read_delim(here("data/animal_traits/MamFuncDat.txt"), delim = "\t") %>% 
+elton.mam <- readr::read_delim(here("data/animal_elton_traits/MamFuncDat.txt"), delim = "\t") %>% 
   dplyr::select(frug_sp_elton = Scientific, family = MSWFamilyLatin, bmass.elton = `BodyMass-Value`) %>%
   mutate(class = "mammal")
 
@@ -177,8 +177,6 @@ frugs <- frug.cons %>%
   arrange(family)
 
 glimpse(frugs)
-
-write_csv(frugs, here("data/animal_traits/frugivores_bmass.csv"))
 
 #frugivores with no body mass info:
 frugs %>% 
