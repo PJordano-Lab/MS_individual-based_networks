@@ -52,3 +52,5 @@ rsconnect/
 #
 networks/attributes
 analysis/web_plot.Rmd
+studies_ind_nets/
+
