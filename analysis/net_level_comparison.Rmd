@@ -98,7 +98,7 @@ autoplot(pc,
   scale_size_continuous(breaks = c(100, 500, 1000, 1500, 2500)) + 
   labs(size = "Network \n size", color = "Network \n type")
 
-#ggsave(here("figs/PCA_sp-sp_vs_ind-sp.pdf"), width = 7, height = 5)
+ggsave(here("figs/PCA_sp-sp_vs_ind-sp.pdf"), width = 7, height = 5)
 ```
 
 

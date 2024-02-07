@@ -19,7 +19,6 @@ library(reshape2)
 library(patchwork)
 library(ggalt)
 library(iNEXT)
-library(iNEXT.link)
 
 theme_set(theme_minimal())
 ```
@@ -155,13 +154,11 @@ glimpse(sc)
 write_csv(sc, here("data/sampling_coverage_inext.csv"))
 ```
 
-
 ```{r}
-ggplot(inext.sc, aes(x = SC, fill = plant_sp)) + 
+ggplot(sc, aes(x = SC, fill = plant_sp)) + 
   geom_histogram() + 
   scale_fill_manual(values = cols.plants)
 ```
-
 
 
 Species Accumulation Curves for each study:
@@ -217,11 +214,11 @@ for (i in 1:length(unique(nets.melted$study_n))){
 
 Save all plots to a pdf (several plots per page)
 ```{r}
-ggsave(
-   filename = "figs/sampling_coverage.pdf", 
-   plot = gridExtra::marrangeGrob(plot_list, nrow=5, ncol=2),
-   width = 10, height = 15
-)
+# ggsave(
+#    filename = "figs/sampling_coverage.pdf", 
+#    plot = gridExtra::marrangeGrob(plot_list, nrow=5, ncol=2),
+#    width = 10, height = 15
+# )
 ```
 
 

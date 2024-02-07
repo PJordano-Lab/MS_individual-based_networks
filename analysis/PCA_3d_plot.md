@@ -1,17 +1,9 @@
----
-title: "3d_PCA"
-author: "Elena Quintero"
-date: "`r Sys.Date()`"
-output: github_document
----
+3d_PCA
+================
+Elena Quintero
+2024-02-07
 
-```{r include = F}
-knitr::opts_chunk$set(message = FALSE)
-knitr::opts_chunk$set(warning = FALSE)
-```
-
-
-```{r, message=F}
+``` r
 library(here)
 library(tidyverse)
 library(tidylog)
@@ -29,7 +21,7 @@ theme_set(theme_minimal())
 
 ### INDIVIDUAL-NODE LEVEL:
 
-```{r}
+``` r
 ind.level.df <- read.csv(here("data/node.level.selection.csv"))
 
 #Normalization function:
@@ -42,7 +34,7 @@ ind.level.df %<>%
 
 Load net colors:
 
-```{r}
+``` r
 net_cols <- read_csv(here("data/net_colors.csv"))
 
 mycols <- as.character(net_cols$cols_continent3)
@@ -52,11 +44,9 @@ col.cont <- as.character(net_cols$cols_continent4)
 names(col.cont) <- as.character(net_cols$continent)
 ```
 
-
-
 # SELECT NETWORK METRICS
 
-```{r}
+``` r
 metrics.pca <- c("normalised.degree", 
                  "species.strength.norm",
                  "species.specificity.index",
@@ -65,39 +55,65 @@ metrics.pca <- c("normalised.degree",
                  )
 ```
 
-
-```{r}
+``` r
 pc_ind <- prcomp(ind.level.df[, metrics.pca],
               center = TRUE,
               scale. = TRUE)
 
 summary(pc_ind)
-print(pc_ind)
+```
 
+    ## Importance of components:
+    ##                           PC1    PC2    PC3    PC4    PC5
+    ## Standard deviation     1.5986 1.0533 0.8357 0.6360 0.4816
+    ## Proportion of Variance 0.5111 0.2219 0.1397 0.0809 0.0464
+    ## Cumulative Proportion  0.5111 0.7330 0.8727 0.9536 1.0000
+
+``` r
+print(pc_ind)
+```
+
+    ## Standard deviations (1, .., p=5):
+    ## [1] 1.5986268 1.0533165 0.8357359 0.6359883 0.4816439
+    ## 
+    ## Rotation (n x k) = (5 x 5):
+    ##                                  PC1        PC2        PC3        PC4
+    ## normalised.degree         -0.5623856  0.1037636 -0.1851769 -0.2107914
+    ## species.strength.norm     -0.4167518 -0.5792946 -0.2327395 -0.5090900
+    ## species.specificity.index  0.5080267 -0.1167135  0.3917285 -0.7010438
+    ## weighted.closeness        -0.3925657 -0.2814196  0.8416542  0.2406943
+    ## mean.bray.overlap         -0.3127962  0.7488871  0.2229547 -0.3834034
+    ##                                  PC5
+    ## normalised.degree          0.7708645
+    ## species.strength.norm     -0.4211833
+    ## species.specificity.index  0.2887441
+    ## weighted.closeness         0.0194833
+    ## mean.bray.overlap         -0.3802891
+
+``` r
 #pairs.panels(pc_ind$x, gap=0, pch=21)
 ```
 
-```{r}
+``` r
 pca_values <- pc_ind[["x"]] %>% 
   as.data.frame() %>%
   cbind(ind_ID = ind.level.df$ind_ID) %>%
   relocate(ind_ID, .before = everything()) %>%
   left_join(ind.level.df)
-
 ```
-
 
 2D plot:
 
-```{r}
+``` r
 ggplot(pca_values, aes(x = PC1, y = PC2, color = continent)) +
   geom_point(size = 2) + scale_color_manual(values = col.cont)
 ```
 
+![](PCA_3d_plot_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 3D plot:
 
-```{r}
+``` r
 library(plotly)
 
 loads <- pc_ind$rotation
@@ -111,7 +127,11 @@ plot3d <- plot_ly(pca_values, x = ~PC3, y = ~PC1, z = ~PC2) %>%
             marker = list(size = 5, opacity = 0.8))
 
 plot3d
+```
 
+![](PCA_3d_plot_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+``` r
 plot3d <- plot_ly() %>%
   add_trace(x = pca_values$PC3, y = pca_values$PC1, z = pca_values$PC2, 
             text = paste0("Ind: ", str_sub(pca_values$ind_ID, 7)),
@@ -123,8 +143,11 @@ plot3d <- plot_ly() %>%
 plot3d
 ```
 
+![](PCA_3d_plot_files/figure-gfm/unnamed-chunk-9-2.png)<!-- -->
+
 Add arrows
-```{r}
+
+``` r
 for (k in 1:nrow(loads)) {
    y <- c(0, loads[k,1])*scale.loads
    z <- c(0, loads[k,2])*scale.loads
@@ -145,3 +168,5 @@ myplot <- plot3d %>% layout(scene = list(xaxis=list(title = "PC3"),
                                zaxis=list(title = "PC2"))) 
 myplot
 ```
+
+![](PCA_3d_plot_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->

@@ -2,7 +2,7 @@
 title: "Estimation of modularity and nestedness metrics"
 author: "Blanca Arroyo-Correa"
 date: "7/17/2023"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
