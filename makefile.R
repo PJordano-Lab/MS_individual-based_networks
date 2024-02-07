@@ -9,9 +9,6 @@ library(rmarkdown)
 # are in ("networks/standardized").
 render("analysis/webs_standarization.Rmd")
 
-#Explore sampling effort per individual:
-render("analysis/sampling_effort.Rmd")
-
 # To obtain main web metrics:
 render("analysis/mod_estimation.Rmd")
 render("analysis/web_metrics.Rmd")
