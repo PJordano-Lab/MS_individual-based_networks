@@ -12,6 +12,6 @@ Contact: Elena Quintero ([elenaquintero.qb\@gmail.com](mailto:elenaquintero.qb@g
 
 ![](figs/DSCN6905.jpeg)
 
-For this study, we compiled 44 empirical individual-based networks on plant-animal seed dispersal mutualism, encompassing 995 plant individuals across 28 species from various regions. We compare the structure of individual-based networks to that of species-based networks and by extending the niche concept to interaction assemblages, we explore levels of individual plant specialization. We examine how individual variation influences network structure and how plant individuals "explore" the interaction niche of the population.
+For this study, we compiled 46 empirical individual-based networks on plant-animal seed dispersal mutualism, encompassing 1037 plant individuals across 29 species from various regions. We compare the structure of individual-based networks to that of species-based networks and by extending the niche concept to interaction assemblages, we explore levels of individual plant specialization. We examine how individual variation influences network structure and how plant individuals "explore" the interaction niche of the population.
 
 Please refer to **makefile.R** for project outline, explanation and codes used.
