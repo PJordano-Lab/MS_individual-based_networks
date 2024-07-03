@@ -18,15 +18,15 @@ library(tidyverse)
 
 Get list of net names in web folder:
 ```{r}
-nets_names_ind <- list.files(path = here("networks/"), pattern = "_int") # For individual-based networks
-nets_names_sp <- list.files(path = here("networks/"), pattern = "sp_")   # For species-based networks
+nets_names_ind <- list.files(path = here("networks/nets_se"), pattern = "_int") # For individual-based networks
+nets_names_sp <- list.files(path = here("networks/nets_se"), pattern = "sp_")   # For species-based networks
 ```
 
 Read webs and apply standardization:
 ```{r}
 # Individual-based networks standardization
 for (i in 1:length(nets_names_ind)){
-  net_file <- paste0("networks/", nets_names_ind[[i]])
+  net_file <- paste0("networks/nets_se/", nets_names_ind[[i]])
   net <- read.csv(here(net_file))
   if(ncol(net)<2){
     net <- read.csv(here(net_file), sep = ";")
@@ -46,7 +46,7 @@ for (i in 1:length(nets_names_ind)){
 
 # Species-based networks standardization
 for (i in 1:length(nets_names_sp)){
-  net_file <- paste0("networks/", nets_names_sp[[i]])
+  net_file <- paste0("networks/nets_se/", nets_names_sp[[i]])
   net <- read.csv(here(net_file))
   if(ncol(net)<2){
     net <- read.csv(here(net_file), sep = ";")
