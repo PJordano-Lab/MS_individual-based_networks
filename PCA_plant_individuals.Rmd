@@ -72,7 +72,7 @@ for (i in 1:1000) {
 }
 ```
 
-### Load data:
+Load cluster assignation data:
 
 ```{r}
 recat.cluster.df <- readRDS(here("data/results_cluster_analysis.rds"))
@@ -115,7 +115,13 @@ summary(full.pca)
 print(full.pca)
 ```
 
-Summarize PCA - medians for point centroids of each individual and extract loadings
+Summarize PCA data:
+
+- most common grouping
+- extract point coords
+- extract PCA loadings
+- extract medians for point centroids of each individual 
+
 
 ```{r}
 most_common_group <- recat.cluster.df |> 
@@ -136,7 +142,11 @@ pca.median <- pca.full.coords |>
   group_by(net_id, plant_sp, net_ind, group_assigned_new) |> 
   summarise(PC1_median = median(PC1),
             PC2_median = median(PC2))
+```
 
+Get summary per population:
+
+```{r}
 net.cluster.summary <- recat.cluster.df |> 
   left_join(info) |> 
   group_by(plant_sp, plot_rank2, net_id, net_n, iter, group_assigned_new) |> 
@@ -147,27 +157,11 @@ net.cluster.summary <- recat.cluster.df |>
 ```
 
 
-# NUMBERS
+## Quantify data in numbers:
 
-Quantify in numbers:
+Percentage of different profile individuals
 
 ```{r}
-# number of times (iters) that a population has at least 1 individual that falls in each category (max = 1000 iters)
-
-net.cluster.summary |> 
-  group_by(net_id, group_assigned_new) |> 
-  summarise(n = n()) |> 
-  pivot_wider(names_from = group_assigned_new, values_from = n)
-
-# number of individuals that mostly fall in each category per population
-
-most_common_group |> 
-  group_by(net_id) |> 
-  count(group_assigned_new) |> 
-  pivot_wider(names_from = group_assigned_new, values_from = n)
-
-# percentage of different profile individuals
-
 net.cluster.summary  |> 
   ungroup() |> 
   select(net_id, iter, per_inds, cluster = group_assigned_new) |>
@@ -177,9 +171,43 @@ net.cluster.summary  |>
   group_by(cluster) |> 
   summarise(mean_per = mean(per_inds),
             ci_per = bayestestR::ci(per_inds, ci = 0.9))
+```
 
-# percentage of "leading" individuals per population
+Number of populations with each profile
 
+```{r}
+net.cluster.summary  |> 
+  ungroup() |> 
+  select(net_id, iter, per_inds, cluster = group_assigned_new) |>
+  mutate(iter = as.character(iter))  |> 
+  group_by(cluster, iter) |> 
+  summarise(n_pops = n_distinct(net_id)) |> 
+  group_by(cluster) |> 
+  summarise(mean_per = mean(n_pops),
+            ci_per = bayestestR::ci(n_pops, ci = 0.90))
+```
+
+Number of times (iters) that a population has at least 1 individual that falls in each category (max = 1000 iters)
+
+```{r}
+net.cluster.summary |> 
+  group_by(net_id, group_assigned_new) |> 
+  summarise(n = n()) |> 
+  pivot_wider(names_from = group_assigned_new, values_from = n)
+```
+
+Number of individuals that mostly fall in each category per population
+
+```{r}
+most_common_group |> 
+  group_by(net_id) |> 
+  count(group_assigned_new) |> 
+  pivot_wider(names_from = group_assigned_new, values_from = n)
+```
+
+Percentage of "leading" individuals per population
+
+```{r}
 net.cluster.summary  |> 
   ungroup() |> 
   filter(group_assigned_new == "Leading") |>
@@ -190,24 +218,10 @@ net.cluster.summary  |>
   group_by(net_id) |> 
   summarise(mean_per = mean(per_inds),
             ci_per = bayestestR::ci(per_inds, ci = 0.90))
-
-
-
-# number of populations with leading individuals
-
-net.cluster.summary  |> 
-  ungroup() |> 
-  filter(group_assigned_new == "Leading") |>
-  select(net_id, iter, per_inds) |>
-  mutate(iter = as.character(iter))  |> 
-  group_by(iter) |> 
-  summarise(n_pops = n_distinct(net_id)) |> 
-  ungroup() |> 
-  summarise(mean_per = mean(n_pops),
-            ci_per = bayestestR::ci(n_pops, ci = 0.90))
 ```
 
-### PLOTS
+
+## PLOTS
 
 Plot proportion of plant individuals assigned to each cluster per net
 
