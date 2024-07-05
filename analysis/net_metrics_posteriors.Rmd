@@ -1,0 +1,255 @@
+---
+title: "Estimation of network metrics for Bayesian networks"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::knit_hooks$set(timeit = local({
+  now = NULL
+  function(before, options) {
+    if (before) {
+      now <<- Sys.time()
+    } else {
+      # calculate the time difference after a chunk
+      res <- difftime(Sys.time(), now, units = "mins")
+      # return a character string to show the time
+      paste("Time for this code chunk to run:", round(res,
+        2), "minutes")
+    }
+  }})
+)
+```
+
+```{r message=FALSE}
+library(network.tools)
+library(tidyverse)
+library(magrittr)
+library(bipartite)
+library(igraph)
+```
+
+## Data
+
+Read network posteriors:
+
+```{r}
+files <- list.files(here::here("networks/nets_post_std"))
+
+#files <- files[c(1)] # mute this command if want to run with all networks.
+
+nets <- list()
+
+for(i in 1:length(files)) {
+  
+  net.post <- readRDS(here::here(paste0("networks/nets_post_std/", files[i]))) |> 
+    mutate(net_id = str_sub(files[i], 1, 5))
+
+  nets[[i]] <- net.post
+  names(nets)[i] <- str_sub(files[i], 1, 5)
+  
+}
+
+```
+
+
+## Calculate network metrics:
+
+### Network level metrics:
+
+```{r}
+indices <- c("number of species", "connectance", "weighted connectance", 
+             "links per species", "NODF", "weighted NODF",
+             "Shannon diversity", "interaction evenness", 
+             "Alatalo interaction evenness", "H2")
+```
+
+```{r, timeit = TRUE}
+metrics.list <- list()
+
+pb = txtProgressBar(min = 0, max = length(nets), style = 3) 
+
+for (i in 1:length(nets)) {
+  
+  net_id <- nets[[i]]
+  
+  net.level.df <- data.frame()
+  
+  for (j in 1:1000) {
+    
+    mat <- net_id |> 
+      filter(iter == j) |> 
+      long2wide()
+    
+    # Most metrics (bipartite)
+    m.bipart <- networklevel(mat, indices)
+    m.bipart <- as.data.frame(t(m.bipart))
+    
+    # Modularity (bipartite)
+    mod <- computeModules(mat)
+    M = mod@likelihood
+    
+    # Igraph metrics
+    inet <- graph_from_biadjacency_matrix(mat, weighted = T,  add.names=NULL)
+    assortativity = assortativity_degree(inet)
+    eigen.centrality = eigen_centrality(inet)$value
+    centr_binary = centr_eigen(inet, scale = TRUE, normalized = TRUE)$centralization
+    centr.weighted.obs = sum(max(eigen_centrality(inet)$vector) - eigen_centrality(inet)$vector)
+    centralization.w = centr.weighted.obs/ centr_eigen(inet)$theoretical_max
+    igraph.metrics <- cbind(assortativity, eigen.centrality, centr_binary, centralization.w)
+    
+    #merge all metrics
+    net.level <- cbind(m.bipart, M, igraph.metrics) |> 
+      select_all(~gsub("\\s+", ".", .)) |> 
+      mutate(net_size = number.of.species.HL * number.of.species.LL) |> 
+      mutate(iter = j,
+             net_id = names(nets)[i]) |> 
+      relocate(net_id, .before = everything()) |> 
+      relocate(iter, .after = net_id)
+    
+    net.level.df <- rbind(net.level.df, net.level)
+    
+  }
+  
+  metrics.list[[i]] <- net.level.df
+  names(metrics.list)[i] <- names(nets)[i]
+  
+  setTxtProgressBar(pb,i)
+}
+```
+
+```{r}
+# a <- metrics.list[[15]]
+# 
+# glimpse(a)
+```
+
+Save net-level metrics:
+
+```{r}
+for (i in 1:length(metrics.list)) {
+  saveRDS(metrics.list[[i]], here::here(paste0("data/net_metrics_posteriors/",
+                                        names(metrics.list)[i],
+                                        "_net_metrics.rds")))
+}
+
+```
+
+
+### Node level metrics:
+
+i.e. individual-level
+
+```{r, timeit = TRUE}
+node.metrics.list <- list()
+
+pb = txtProgressBar(min = 0, max = length(nets), style = 3) 
+
+for (i in 1:length(nets)) {
+  
+  net_id <- nets[[i]]
+    
+  ind.level.df <- data.frame()
+  
+  for (j in 1:1000) {
+    
+    mat <- net_id |> 
+      filter(iter == j) |> 
+      long2wide()
+  
+    #bipartite metrics:
+    m.bipart <- specieslevel(mat, level = "lower") |> 
+      rownames_to_column("ind")
+    
+    #betweenness and closeness metrics (tnet):
+    inet <- graph_from_biadjacency_matrix(mat, weighted= T,  add.names=NULL)
+    NodeLabels <- V(inet)$name
+    NodeType <- V(inet)$type
+    nodes_id <- cbind(NodeLabels, NodeType) |> 
+     as.data.frame() |> 
+     filter(NodeType == "FALSE") %>%
+     select(ind = NodeLabels) %>%
+     rownames_to_column("node")
+        tm <- as_edgelist(inet, names=FALSE)
+    w <- E(inet)$weight
+    w.tm <- cbind(tm, w)
+    
+    om.tm <- projecting_tm(tm, "Newman") #One mode projection
+    om.w.tm <- projecting_tm(w.tm, "Newman") #One mode projection
+    
+    closeness <- tnet::closeness_w(om.tm) %>% as.data.frame() %>% 
+     select(node, tm.closeness = closeness)
+    w.closeness <- tnet::closeness_w(om.w.tm) %>% as.data.frame()  %>% 
+     select(node, tm.w.closeness = closeness)
+    betweenness <- tnet::betweenness_w(om.tm) %>% as.data.frame() %>% 
+     select(node, tm.betweenness = betweenness)
+    w.betweenness <- tnet::betweenness_w(om.w.tm) %>% as.data.frame() %>% 
+     select(node, tm.w.betweenness = betweenness)
+    
+    w.mets <- full_join(closeness, w.closeness, by = "node") %>%  
+     # don't do cbind because in some nets closeness is not calculated for all nodes (bec of singletons)
+     full_join(betweenness, by = "node") %>% 
+     full_join(w.betweenness, by = "node") %>% 
+     mutate(node = as.character(node)) %>%
+     left_join(nodes_id, by = "node") %>%
+     mutate(tm.closeness = ifelse(is.na(tm.closeness), 0, tm.closeness),
+            tm.w.closeness = ifelse(is.na(tm.w.closeness), 0, tm.w.closeness)) # assign zero values to nodes where no closeness.
+    
+    #Mean overlap
+    mat_no0 <- as.data.frame(mat) %>% 
+     filter(rowSums(.) > 0) 
+    mat_no0 = mat_no0[,colSums(mat_no0) > 0]
+    
+    bray.overlap <-  as.matrix(vegdist(mat_no0, method = "bray")) %>%
+     as.data.frame() %>% 
+     rownames_to_column("ind") %>% 
+     reframe(ind = ind,
+             mean.bray.overlap = 1 - rowMeans(select(., -1)))
+    
+    jaccard.overlap <- as.matrix(vegdist(mat_no0, method = "jaccard")) %>% 
+     as.data.frame() %>%
+     rownames_to_column("ind") %>% 
+     reframe(ind = ind,
+             mean.jaccard.overlap = 1 - rowMeans(select(., -1)))
+    
+    overlap <- full_join(bray.overlap, jaccard.overlap, by = "ind")
+    
+    #Merge all metrics
+    ind.level <- m.bipart |> 
+      left_join(w.mets, by = "ind") |> 
+      left_join(overlap, by = "ind") |> 
+      mutate(iter = j,
+             net_id = names(nets)[i]) |> 
+      relocate(net_id, .before = everything()) |> 
+      relocate(iter, .after = net_id)
+    
+    ind.level.df <- rbind(ind.level.df, ind.level)
+    
+  }
+  
+  node.metrics.list[[i]] <- ind.level.df
+  names(node.metrics.list)[i] <- names(nets)[i]
+  
+  setTxtProgressBar(pb,i)
+  
+}
+```
+
+By using Newman's method to calculate the one-mode projection of the net, this methods creates a one-mode projection in which the strength of a node is equal to the number of ties originating from that node in the two-mode network (e.g. the sum of weights attached to ties originating from node A in the one-mode projection is 2, and node A is connected to two red nodes). Newman bases the weights on Newman's (2001) method of discounting for the size of collaborations.
+
+```{r}
+# a <- node.metrics.list[[15]]
+# 
+# glimpse(a)
+```
+
+Save node-level metrics:
+
+```{r}
+for (i in 1:length(node.metrics.list)) {
+  saveRDS(node.metrics.list[[i]], here::here(paste0("data/net_metrics_posteriors/",
+                                        names(node.metrics.list)[i],
+                                        "_node_metrics.rds")))
+}
+```

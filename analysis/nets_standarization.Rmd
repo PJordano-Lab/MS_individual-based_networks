@@ -1,0 +1,209 @@
+---
+title: "Networks standarization"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(network.tools)
+library(patchwork)
+```
+
+# Data
+
+## 1. Specify parameters:
+
+(1) network id, (2) sampling effort and (3) whether controlling for differential sampling effort in plant individuals is needed:
+
+```{r}
+params <- read_csv2(here("networks/nets_se/nets_parameters.csv"))
+
+# List of networks
+net_id <- params$net_id
+
+# List of sampling effort for each individual-based networks
+se_net <- params$sampling_effort
+
+# List of whether individuals require controlling by sampling effort
+control_needed <- params$necessary_stand
+
+```
+
+## 2. Read individual-based networks:
+
+```{r message=FALSE, results='hide'}
+ind.files <- list.files(here("networks/nets_raw"))
+
+nets.ind <- str_sub(ind.files, 1, 5)
+
+#remove small nets
+nets.selec.ind <- nets.ind[! nets.ind %in% c("08_01", "12_01", "12_06", "12_07")]
+
+nets.ind <- list()
+
+for (i in 1:length(nets.selec.ind)) {
+  
+  print(nets.selec.ind[i])
+    
+    net <- read_csv(here::here(paste0("networks/nets_raw/",
+                                        nets.selec.ind[i],
+                                        "_int.csv")))
+
+    nets.ind[[i]] <- net
+    names(nets.ind)[i] <- nets.selec.ind[i]
+
+}
+```
+
+
+## 2. Read species-based networks:
+
+```{r message=FALSE, results='hide'}
+sp.files <- list.files(here("networks/nets_sp_raw"))
+
+nets.sp <- str_sub(sp.files, 1, 8)
+
+#remove small nets
+nets.selec.sp <- nets.sp[! nets.sp %in% c("sp_03_01", "sp_03_02",
+                                          "sp_03_03", "sp_03_04",
+                                          "sp_05_01", "sp_09_01",
+                                          "sp_29_12", "sp_31_01",
+                                          "sp_44_01")]
+
+nets.sp <- list()
+
+for (i in 1:length(nets.selec.sp)) {
+    
+    print(nets.selec.sp[i])
+    
+    net <- read.csv(here::here(paste0("networks/nets_sp_raw/",
+                                        nets.selec.sp[i],
+                                        ".csv")), sep = ";")
+
+   nets.sp[[i]] <- net
+   names(nets.sp)[i] <- nets.selec.sp[i]
+  
+}
+```
+
+
+## 3. Read info on sampling effort for individual-based network:
+
+```{r message=FALSE, results='hide'}
+nets.ind.se <- list()
+
+for (i in 1:length(nets.selec.ind)) {
+  
+  if (control_needed[i] == "YES") {
+    
+    print(net_id[i])
+    
+    effort <- read_csv(here::here(paste0("networks/nets_se/",
+                                         nets.selec.ind[i],
+                                         "_attr.csv"))) |>
+      select(ind, SE = se_net[i]) |> 
+      mutate(ind = as.character(ind))
+
+    nets.ind.se[[i]] <- effort
+    names(nets.ind.se)[i] <- nets.selec.ind[i]
+  
+  }
+  else {
+  }
+}
+```
+
+
+## 4 Divide interactions by sampling effort:
+
+Only if necessary controlling by sampling effort. That is, networks where sampling effort was already accounted for or where plant individuals where sampled with the same effort do not require this step.
+
+```{r message=FALSE, results='hide'}
+for (i in 1:length(nets.ind)) {
+  
+    if (control_needed[i] == "YES"){
+      
+      net.se <- nets.ind[[i]] |> 
+        mutate(ind = as.character(ind)) |> 
+        pivot_longer(cols = -1, names_to = "animal", values_to = "int") |>
+        left_join(nets.ind.se[[i]], by = "ind") |> 
+        mutate(int = int / SE) |> 
+        pivot_wider(names_from = animal, values_from = int) |> 
+        select(-SE)
+      
+      nets.ind[[i]] <- net.se
+      names(nets.ind)[i] <- nets.selec.ind[i]
+      
+    }
+  
+    else {
+
+    }
+}
+```
+
+
+## 5. Standarize matrix
+
+Refer matrix to interaction proportion by dividing all unique interaction by the total no. of interactions (a.k.a. Grand Total Standardization, GTS) - this makes them comparable.
+
+For individual-based nets:
+
+```{r, message=FALSE, results='hide'}
+
+
+gts <- function(net) {
+  
+  net_mat <- net |> column_to_rownames("ind") |>  as.matrix()
+  mat_gts <- net_mat/sum(net_mat)
+  net_gts <- as.data.frame(mat_gts) %>% rownames_to_column("ind")
+  
+}
+
+nets.std.ind <- lapply(nets.ind, gts)
+names(nets.std.ind) <- names(nets.ind)
+```
+
+For species-based nets:
+
+```{r, message=FALSE, results='hide'}
+gts.sp <- function(net) {
+  
+  net_mat <- net |> column_to_rownames("sp") |>  as.matrix()
+  mat_gts <- net_mat/sum(net_mat)
+  net_gts <- as.data.frame(mat_gts) %>% rownames_to_column("sp")
+  
+}
+
+nets.std.sp <- lapply(nets.sp, gts.sp)
+names(nets.std.sp) <- names(nets.sp)
+
+```
+
+
+## 6. Save matrices
+
+```{r message=FALSE, results='hide'}
+for (i in 1:length(nets.std.ind)) {
+    
+    write_csv(nets.std.ind[[i]], 
+            here(paste0("networks/nets_std/", 
+                        names(nets.std.ind)[i], 
+                        "_int_std.csv")))
+}
+```
+
+
+```{r message=FALSE, results='hide'}
+for (i in 1:length(nets.std.sp)) {
+    
+    write_csv(nets.std.sp[[i]], 
+            here(paste0("networks/nets_std/", 
+                        names(nets.std.sp)[i], 
+                        "_int_std.csv")))
+}
+
+```

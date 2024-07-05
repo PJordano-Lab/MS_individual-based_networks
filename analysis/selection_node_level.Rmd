@@ -29,52 +29,93 @@ library(reshape2)
 
 -----------------
 
-Load all networks metrics:
+
+Load metrics from posteriors data:
 
 ```{r}
-ind.level.df <- read.csv(here("data/node.level.selection.csv"))
+files <- list.files(here("data/net_metrics_posteriors/"))
 
-glimpse(ind.level.df)
+#select only those files with node metrics (not net metrics)
+files_nodes <- files[grep("node", files)]
+
+df.metrics <- data.frame()
+
+for (i in 1:length(files_nodes)) {
+  
+  df <- readRDS(here(paste0("data/net_metrics_posteriors/", files_nodes[i]))) |> 
+    dplyr::select(-c(node,Fisher.alpha)) |> 
+    mutate(net_ind = paste0(net_id, "-", ind))
+  
+  df.metrics <- rbind(df.metrics, df)
+  
+}
+
+glimpse(df.metrics)
+
+# no. of networks:
+unique(df.metrics$net_id)
+length(unique(df.metrics$net_id))
+
+# no. of plant individuals:
+length(unique(df.metrics$net_ind))
 ```
-
-Normalization function:
 
 ```{r}
-min_max_norm <- function(x){(x-min(x))/(max(x)-min(x))}
-```
+info <- readxl::read_xlsx(here("data/selected_networks.xlsx")) |>
+  filter(type == "ind") |> 
+  select(net_id = code_ID, plant_sp)
 
-Normalize species strength:
+net.cols <- read.csv(here("data/net_colors.csv"))
+
+#Net colors:
+cols.bio <- as.character(net.cols$cols_bioregions2)
+names(cols.bio) <- as.character(net.cols$plant_sp)
+
+cols.bio.d <- as.character(net.cols$cols_bioregions_d2)
+names(cols.bio.d) <- as.character(net.cols$bioregion)
+
+df.post <- df.metrics |> 
+  left_join(info) |> 
+  left_join(net.cols)
+```
 
 ```{r}
-ind.level.df %<>% 
-  group_by(net_id) %>% 
-  mutate(species.strength.norm = min_max_norm(species.strength))
+df.mean <- df.post |> 
+  group_by(net_id, plant_sp, bioregion, net_ind) |> 
+  summarise_at(vars(degree:mean.jaccard.overlap), mean)
 ```
+
+
+Plant individuals and species in each bioregion:
+
+```{r}
+df.mean |> 
+  group_by(bioregion) |> 
+  summarise(n_inds = n_distinct(net_ind),
+            n_sp = n_distinct(plant_sp))
+```
+
 
 Full comparison metrics:
 
 ```{r, fig.width=12, fig.height=10}
 metrics <- c("normalised.degree",
-              #"proportional.generality",
-             "species.strength.norm",
-             #"interaction.push.pull",
+             "species.strength",
              "species.specificity.index",
              "weighted.closeness",
-             #"proportional.similarity",
-             #"d",
              "mean.bray.overlap")
 
-#colnames(ind.level.df)
-
 ggpairs(
- ind.level.df, columns = metrics,
+ df.mean, columns = metrics,
  lower = list(continuous = wrap("points", pch = 21, color = "white", fill= "black", size = 0.75))) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
 
 ```{r}
-interest.metrics <- ind.level.df %>% ungroup() %>% dplyr::select(all_of(metrics))
+interest.metrics <- df.mean %>% 
+  ungroup() %>% 
+  dplyr::select(all_of(metrics))
 
 source(here("functions/vif_function.R"))
 
@@ -91,14 +132,14 @@ n.animals <- net.level %>%
          animals = number.of.species.HL, 
          net_size)
 
-df <- ind.level.df %>%
+df <- df.mean %>%
   ungroup() %>% 
   dplyr::select(net_id, all_of(metrics)) %>%
   group_by(net_id) %>%
   mutate(plants = n()) %>%
   left_join(n.animals) %>%
   rename("Normalised degree" = normalised.degree,
-         "Species strength" = species.strength.norm,
+         "Species strength" = species.strength,
          "Species specificity" = species.specificity.index,
          "Weighted closeness" = weighted.closeness,
          "Mean Bray overlap " = mean.bray.overlap,
@@ -117,21 +158,13 @@ ggsave(here("figs/cor_node_metrics.pdf"), width = 6, height = 6)
 
 ## Node metrics distibution:
 
-```{r}
-#Net colors:
-mycols <- as.character(ind.level.df$cols_continent3)
-names(mycols) <- as.character(ind.level.df$plant_sp)
-theme_set(theme_bw())
-```
-
-
 # Plot metrics distribution by net
 
 ```{r}
 plot_density_metric <- function(metric){
-    plot <- ggplot(ind.level.df, aes(x = {{metric}}, color = plant_sp)) + 
+    plot <- ggplot(df.mean, aes(x = {{metric}}, color = plant_sp)) + 
         geom_density(bw = 0.1) +
-        scale_color_manual(values = mycols) + 
+        scale_color_manual(values = cols.bio) + 
         theme(legend.position = "none") + 
         scale_x_continuous(limits = c(0,1)) +
         labs(y = NULL)
@@ -148,7 +181,7 @@ plot_density_metric(normalised.degree)
 
 ```{r}
 p1 <- plot_density_metric(normalised.degree) + labs(x = "Normalised degree")
-p2 <- plot_density_metric(species.strength.norm) + labs(x = "Species strength")
+p2 <- plot_density_metric(species.strength) + labs(x = "Species strength")
 p3 <- plot_density_metric(species.specificity.index) + labs(x = "Species specificity index")
 p4 <- plot_density_metric(weighted.closeness) + labs(x = "Weighted closeness")
 p5 <- plot_density_metric(mean.bray.overlap) + labs(x = "Mean Bray overlap")
@@ -161,7 +194,5 @@ design <- "
 "  
 
 (p1 + p2 + p3 + p5 + p4) + plot_layout(design = design)
-
-ggsave(here("figs/node_metrics_distribution.pdf"), width = 8, height = 6)
 ```
 

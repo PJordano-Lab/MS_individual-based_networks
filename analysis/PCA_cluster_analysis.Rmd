@@ -1,0 +1,264 @@
+---
+title: "Cluster analysis for PCA (dapc) using network posteriors"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+
+knitr::knit_hooks$set(timeit = local({
+  now = NULL
+  function(before, options) {
+    if (before) {
+      now <<- Sys.time()
+    } else {
+      # calculate the time difference after a chunk
+      res <- difftime(Sys.time(), now, units = "mins")
+      # return a character string to show the time
+      paste("Time for this code chunk to run:", round(res,
+        2), "minutes")
+    }
+  }})
+)
+```
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(tidylog)
+library(psych)
+library(ggfortify)
+library(ggnewscale)
+library(patchwork)
+theme_set(theme_minimal())
+```
+
+### INDIVIDUAL-NODE LEVEL:
+
+Load metrics from posteriors data:
+
+```{r}
+files <- list.files(here("data/net_metrics_posteriors/"))
+
+#select only those files with node metrics (not net metrics)
+files_nodes <- files[grep("node", files)]
+
+df.metrics <- data.frame()
+
+for (i in 1:length(files_nodes)) {
+  
+  df <- readRDS(here(paste0("data/net_metrics_posteriors/", files_nodes[i]))) |> 
+    dplyr::select(-c(node,Fisher.alpha)) |> 
+    mutate(net_ind = paste0(net_id, "-", ind))
+  
+  df.metrics <- rbind(df.metrics, df)
+  
+}
+
+glimpse(df.metrics)
+
+# no. of networks:
+unique(df.metrics$net_id)
+length(unique(df.metrics$net_id))
+
+# no. of plant individuals:
+length(unique(df.metrics$net_ind))
+```
+
+Load networks information:
+
+```{r}
+info <- read.csv(here("data/net.level.selection.csv")) |> 
+  filter(type == "ind") |> 
+  select(net_id, net_n, net_code, code_ID, ref, 
+         family, plant_sp, bioregion, continent,
+         plot_rank1, plot_rank2, 
+         number.of.species.HL, number.of.species.LL)
+```
+
+Load net colors:
+
+```{r}
+net_cols <- read_csv(here("data/net_colors.csv"))
+
+col.bio <- as.character(net_cols$cols_bioregions2)
+names(col.bio) <- as.character(net_cols$plant_sp)
+
+col.bio.d <- as.character(net_cols$cols_bioregions_d2)
+names(col.bio.d) <- as.character(net_cols$bioregion)
+```
+
+
+# SELECT NETWORK METRICS
+
+```{r}
+metrics.pca <- c("normalised.degree", 
+                 "species.strength",
+                 "species.specificity.index",
+                 "weighted.closeness",
+                 "mean.bray.overlap")
+```
+
+Perform PCA with 1000 posteriors (i.e. 1000 scenarios)
+
+```{r}
+pca.list <- list()
+
+for (i in 1:1000) {
+  
+  scenario <- df.metrics[, c("iter", metrics.pca)] |> 
+    filter(iter == i) |> 
+    dplyr::select(-iter)
+  
+  pc_ind <- prcomp(scenario,
+              center = TRUE,
+              scale. = TRUE)
+  
+  pca.list[[i]] <- pc_ind
+  
+}
+
+# summary(pca.list[[3]])
+# print(pca.list[[3]])
+```
+
+Plot example PCAs
+
+```{r, include=FALSE, eval=FALSE}
+
+for (i in 1) {
+  
+  scenario <- df.metrics |> 
+    filter(iter == i) |> 
+    left_join(info)
+  
+  pca.results <- pca.list[[i]]
+  
+  mycolors <- colorRampPalette(rcartocolor::carto_pal(12,
+             "Vivid"))(length(unique(scenario$net_id)))
+ 
+  # plot PCA
+  pca.plot <- autoplot(pca.results,
+         data = scenario,
+         loadings = TRUE,
+         loadings.level = TRUE,
+         loadings.label = TRUE, 
+         loadings.label.size = 3, 
+         loadings.colour = "grey20",
+         loadings.label.colour = "grey20",
+         color ="white") +
+  stat_ellipse(type = "norm", color = "grey20", level = 0.95, linewidth = 0.6) + 
+  geom_point(aes(color = plant_sp), alpha = 0.75, size = 3) +
+  scale_color_manual(values = col.bio) + 
+  labs(title = paste0("iter: ", i)) + 
+  theme(legend.position = "none")
+  
+  print(pca.plot)
+  
+}
+
+#pca.plot + facet_wrap(~net_id) 
+```
+
+
+## Compute clusters
+
+```{r eval=FALSE}
+library(adegenet)
+
+max_iter = 1000
+
+n_clusters = 4
+
+cluster.df <- data.frame()
+
+for (i in 1:max_iter) {
+  
+  for (c in n_clusters){
+    
+    data <- df.metrics |> 
+      filter(iter == i)
+    
+    pca.data <- df.metrics[, c("iter", metrics.pca)] |> 
+      filter(iter == i) |> 
+      dplyr::select(-iter)
+    
+    grp <- find.clusters(pca.data, n.pca = 3, n.clust = c) 
+    
+    dapc <- dapc(pca.data, grp$grp, n.pca = 3, n.da = 2)
+    
+    group = data.frame(group_assigned = dapc$assign)
+    
+    assig.prob <- data.frame(dapc$posterior)
+    
+    pca_id <- pca.list[[i]]
+    
+    pca_values <- pca_id[["x"]] |> 
+      as.data.frame() |> 
+      cbind(net_ind = data$net_ind) |> 
+      cbind(group) |> 
+      cbind(assig.prob) |> 
+      relocate(net_ind, .before = everything()) |> 
+      left_join(data, by = "net_ind") |> 
+      mutate(iter = i,
+             clusters = c)
+    
+    cluster.df <- rbind(cluster.df, pca_values)
+
+  }
+  
+}
+
+```
+
+
+Re-categorize the name of the clusters based on some plants that don't usually change position:
+
+```{r, eval = FALSE}
+inds_to_select <- cluster.df |> 
+  group_by(net_id, net_ind) |> 
+  summarise(n = n(),
+            key = mean(weighted.closeness),
+            spez = mean(species.specificity.index),
+            overlap = mean(mean.bray.overlap)) |> 
+  filter(n == 1000)
+
+
+recat.cluster.df <- data.frame()
+
+for (i in 1:max_iter) {
+  
+  cluster.df.iter <- cluster.df |> 
+    filter(iter == i) 
+    #filter(clusters == 4)
+
+    key <- cluster.df.iter |> 
+      filter(net_ind == "05_01-1823")
+    
+    spez <- cluster.df.iter |> 
+      filter(net_ind == "03_05-61")
+    
+    overlap <- cluster.df.iter |> 
+      filter(net_ind == "12_10-ZIZO15")
+
+  tmp <- cluster.df.iter |> 
+    mutate(group_assigned_new = case_when(group_assigned == 
+                                            as.numeric(key$group_assigned) ~ "Leading", 
+                                          group_assigned == 
+                                            as.numeric(spez$group_assigned) ~ "Specialists",
+                                          group_assigned == 
+                                            as.numeric(overlap$group_assigned) ~ "Overlapping"
+                                          ))
+  
+  recat.cluster.df <- rbind(recat.cluster.df, tmp)
+
+}
+
+recat.cluster.df <- recat.cluster.df |> 
+  mutate(group_assigned_new = ifelse(is.na(group_assigned_new), "Neutral", group_assigned_new))
+
+saveRDS(recat.cluster.df, here("data/results_cluster_analysis.rds"))
+```

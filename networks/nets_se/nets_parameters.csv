@@ -1,0 +1,108 @@
+net_code;net_id;sampling_effort;necessary_stand;ref;plant_sp
+ind_01_01;01_01;;NO;Quintero et al 2023 Ecology letters;Pistacia lentiscus
+ind_01_02;01_02;;NO;Quintero et al 2023 Ecology letters;Pistacia lentiscus
+ind_02_01;02_01;;NO;Isla et al 2023 PRSB;Juniperus phoenicea
+ind_02_02;02_02;;NO;Isla et al 2023 PRSB;Juniperus phoenicea
+ind_02_03;02_03;;NO;Isla et al 2023 PRSB;Juniperus phoenicea
+ind_03_01;03_01;se_obs_h;NO;Vergara-Tabares et al 2022 Oikos;Lithraea molleoides
+ind_03_02;03_02;se_obs_h;NO;Vergara-Tabares et al 2022 Oikos;Lithraea molleoides
+ind_03_03;03_03;se_obs_h;NO;Vergara-Tabares et al 2022 Oikos;Lithraea molleoides
+ind_03_04;03_04;se_obs_h;NO;Vergara-Tabares et al 2022 Oikos;Lithraea molleoides
+ind_03_05;03_05;se_obs_h;NO;Vergara-Tabares et al 2022 Oikos;Lithraea molleoides
+ind_03_06;03_06;se_obs_h;NO;Vergara-Tabares et al 2022 Oikos;Lithraea molleoides
+ind_04_01;04_01;se_obs_h;YES;Rodriguez-Sanchez 2010 PhD thesis;Laurus nobilis
+ind_05_01;05_01;se_obs_h;YES;Jordano 1995 Ecology;Prunus mahaleb
+ind_06_01;06_01;se_obs_h;NO;Friedemann et al 2022 Oikos;Euterpe edulis
+ind_06_02;06_02;se_obs_h;NO;Friedemann et al 2022 Oikos;Euterpe edulis
+ind_06_03;06_03;se_obs_h;NO;Friedemann et al 2022 Oikos;Euterpe edulis
+ind_07_01;07_01;se_obs_h;NO;Cecropia Frugivory course;Cecropia glaziovii
+ind_08_02;08_02;se_obs_h;YES;Gopal et al 2020 Biotropica;Heynea trijuga
+ind_08_03;08_03;se_obs_h;YES;Gopal et al 2020 Biotropica;Myristica dactyloides
+ind_08_04;08_04;se_obs_h;YES;Gopal et al 2020 Biotropica;Persea macrantha
+ind_09_01;09_01;se_obs_h;NO;Crestani et al 2018 Acta Oecologica;Henriettea succosa
+ind_10_01;10_01;se_cam_h;YES;Lamperty et al 2021 Biotropica;Prestoea decurrens
+ind_11_01;11_01;se_cam_days;YES;Corema album - unpublished;Corema album
+ind_12_02;12_02;se_obs_h;YES;Ramaswami et al 2017 Plant Ecology;Bursera penicillata
+ind_12_03;12_03;se_obs_h;YES;Ramaswami et al 2017 Plant Ecology;Erythroxylum monogynum
+ind_12_04;12_04;se_obs_h;YES;Ramaswami et al 2017 Plant Ecology;Flacourtia indica
+ind_12_05;12_05;se_obs_h;YES;Ramaswami et al 2017 Plant Ecology;Flueggea leucopyrus
+ind_12_08;12_08;se_obs_h;YES;Ramaswami et al 2017 Plant Ecology;Canthium coromandelicum
+ind_12_09;12_09;se_obs_h;YES;Ramaswami et al 2017 Plant Ecology;Santalum album
+ind_12_10;12_10;se_obs_h;YES;Ramaswami et al 2017 Plant Ecology;Ziziphus oenopolia
+ind_13_01;13_01;se_obs_days;NO;Jacome-Flores et al 2019 Oikos;Chamaerops humilis
+ind_13_02;13_02;se_obs_days;NO;Jacome-Flores et al 2019 Oikos;Chamaerops humilis
+ind_14_01;14_01;se_obs_h;NO;Guerra et al 2017 Oecologia;Miconia irwinii
+ind_15_01;15_01;se_cam_days;YES;Juniperus macrocarpa - unpublished;Juniperus macrocarpa
+ind_16_01;16_01;se_cam_h;NO;Miguel et al 2018 Oikos;Prosopis flexuosa
+ind_16_02;16_02;se_cam_h;NO;Miguel et al 2018 Oikos;Prosopis flexuosa
+ind_16_03;16_03;se_cam_h;NO;Miguel et al 2018 Oikos;Prosopis flexuosa
+ind_16_04;16_04;se_cam_h;NO;Miguel et al 2018 Oikos;Prosopis flexuosa
+ind_16_05;16_05;se_cam_h;NO;Miguel et al 2018 Oikos;Prosopis flexuosa
+ind_17_01;17_01;se_obs_h;NO;Visotto et al 2022 Oecologia;Schinus terebinthifolia
+ind_18_01;18_01;se_bc_days;YES;Phyllirea angustifolia - unpublished;Phillyrea angustifolia
+ind_18_02;18_02;se_bc_days;YES;Phyllirea angustifolia - unpublished;Phillyrea angustifolia
+ind_19_01;19_01;se_obs_h;YES;Thiel et al 2023 Biotropica;Marcgravia longifolia
+ind_20_01;20_01;se_bc_days;YES;Osyris lanceolata - unpublished;Osyris lanceolata
+ind_21_01;21_01;se_obs_h;YES;Jayanth et al 2024 Biotropica;Naringi crenulata
+ind_21_02;21_02;se_obs_h;YES;Jayanth et al 2024 Biotropica;Ziziphus oenopolia
+sp_01_01;01_01;;NO;Olesen et al 2011 PRSB;NA
+sp_01_02;01_02;;NO;Olesen et al 2011 PRSB;NA
+sp_02_01;02_01;;NO;Garcia-Castaño et al 2011 PhD thesis;NA
+sp_04_01;04_01;;NO;Beehler 1983 Auk;NA
+sp_06_01;06_01;;NO;Frost 1980 Acta XVII Cong. Internat. Ornitho.;NA
+sp_07_01;07_01;;NO;Guitián 1983 PhD thesis;NA
+sp_08_01;08_01;;NO;Galetti & Pizo 1996 Ararajuba;NA
+sp_09_01;09_01;;NO;Kantak 1979 Auk;NA
+sp_10_01;10_01;;NO;Snow & Snow 1988 Bird and berries;NA
+sp_11_01;11_01;;NO;Noma 1997 Ecological Research;NA
+sp_12_01;12_01;;NO;Crome 1975 Aust Wildl Res;NA
+sp_13_01;13_01;;NO;Snow & Snow 1971 Auk;NA
+sp_14_01;14_01;;NO;Baird 1980 Wilson Bulletin;NA
+sp_15_01;15_01;;NO;Menke et al 2012 Oikos;NA
+sp_15_02;15_02;;NO;Menke et al 2012 Oikos;NA
+sp_15_03;15_03;;NO;Menke et al 2012 Oikos;NA
+sp_15_04;15_04;;NO;Menke et al 2012 Oikos;NA
+sp_16_01;16_01;;NO;Pizo 2004 Ornitologia Neotropical;NA
+sp_17_01;17_01;;NO;Schleuning et al 2011 Ecology;NA
+sp_18_01;18_01;;NO;Castro 2007 PhD thesis;NA
+sp_19_01;19_01;;NO;Correia 1997 PhD thesis;NA
+sp_20_01;20_01;;NO;Alves 2008 PhD thesis;NA
+sp_21_01;21_01;;NO;Athie 2009 PhD thesis;NA
+sp_22_01;22_01;;NO;Fadini & de Marco 2004 Ararajuba;NA
+sp_23_01;23_01;;NO;Hasui 1994 MSc thesis;NA
+sp_24_01;24_01;;NO;Silva 2011 MSc thesis;NA
+sp_25_01;25_01;;NO;Ribeiro da Silva et al 2015 Restoration Ecology;NA
+sp_25_02;25_02;;NO;Ribeiro da Silva et al 2015 Restoration Ecology;NA
+sp_25_03;25_03;;NO;Ribeiro da Silva et al 2015 Restoration Ecology;NA
+sp_26_01;26_01;;NO;Robinson 2015 PhD thesis;NA
+sp_27_01;27_01;;NO;Rodrigues 2015 PhD thesis;NA
+sp_28_01;28_01;;NO;Burns 2013 Ecology;NA
+sp_29_01;29_01;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_02;29_02;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_03;29_03;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_04;29_04;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_05;29_05;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_06;29_06;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_07;29_07;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_08;29_08;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_09;29_09;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_10;29_10;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_11;29_11;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_12;29_12;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_29_13;29_13;;NO;Albrecht et al 2015 J of Ecology;NA
+sp_30_01;30_01;;NO;Andrade et al 2011 Rev. Brasileira de Ornitologia;NA
+sp_32_01;32_01;;NO;Yang et al 2013 Ecosphere;NA
+sp_33_01;33_01;;NO;Garcia et al 2000 Rev. Biología Tropical;NA
+sp_34_01;34_01;;NO;Gorchov et al 1995 Oikos;NA
+sp_35_01;35_01;;NO;Palmeirim et al 1989 Oecologia;NA
+sp_36_01;36_01;;NO;Lopez & Vaughan 2004 Acta Chiropterologica;NA
+sp_37_01;37_01;;NO;Heleno et al 2013 Proc Biol Sci;NA
+sp_38_01;38_01;;NO;Hernandez-Montero et al 2015 PloS ONE;NA
+sp_38_02;38_02;;NO;Hernandez-Montero et al 2015 PloS ONE;NA
+sp_39_01;39_01;;NO;Passos et al 2003 Rev. Brasileira de Zoologia;NA
+sp_40_01;40_01;;NO;Pedro 1992 PhD thesis;NA
+sp_41_01;41_01;;NO;Poulin et al 1999 J Tropical Ecol;NA
+sp_42_01;42_01;;NO;Sarmento et al 2014 Zoologia;NA
+sp_43_01;43_01;;NO;Stiebel & Barlein 2008 Vogelwarte;NA
+sp_45_01;45_01;;NO;Saavedra et al 2014 Oecologia;NA
+sp_45_02;45_02;;NO;Saavedra et al 2014 Oecologia;NA

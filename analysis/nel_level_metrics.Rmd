@@ -1,0 +1,214 @@
+---
+title: "Calculate network-level metrics"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+
+```{r include = F}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(magrittr)
+library(reshape2)
+library(bipartite)
+library(ggrepel)
+library(patchwork)
+
+theme_set(theme_bw())
+```
+
+## 1. Read all networks:
+
+```{r Read networks}
+#Read list of names
+nets_names <- list.files(path = here("networks/nets_std/"), pattern = "_int")
+
+#Create empty list
+nets <- list()
+
+#Add all read files and add to the list
+
+for (i in 1:length(nets_names)){
+  
+  net_file <- paste0("networks/nets_std/", nets_names[[i]])
+  net <- read.csv(here(net_file))
+  nets[[i]] <- net #add to list
+  names(nets)[i] <- nets_names[[i]] #name the list
+  
+}
+```
+
+## 2. Read nets characteristics (name, site etc...)
+
+```{r Reading net characteristics for Individial-based networks}
+nets_char <- readxl::read_xlsx(here("data/selected_individual_networks.xlsx"))
+
+nets_ID <- nets_char %>%
+  select(net_id = code_ID,
+         ref,
+         plant_sp = `focus species`,
+         pop = pop_site) %>%
+  mutate(net_name = paste0(plant_sp, "_", pop)) %>%
+  group_by(net_id) %>%
+  mutate(net_n = cur_group_id())
+```
+
+```{r Reading net characteristics for Species-based networks}
+nets_char_sp <- readxl::read_xlsx(here("data/selected_networks.xlsx"))
+
+nets_ID_sp <- nets_char_sp %>% 
+  filter (type == "sp") %>%
+  select(net_id = code_ID,
+         ref) %>%
+  mutate(net_name = paste0(net_id, "_", ref)) %>%
+  group_by(net_id) %>%
+  mutate(net_n = cur_group_id())
+```
+
+
+## 3. Network level metrics:
+
+```{r}
+indices <- as.list(c("number of species", "connectance", "weighted connectance", 
+                     "links per species", "NODF", "weighted NODF",
+                     "cluster coefficient", "weighted cluster coefficient", 
+                     "generality", "linkage density", 
+                     "Shannon diversity", "interaction evenness", 
+                     "Alatalo interaction evenness", "H2", 
+                     "ISA", "SA", "web asymmetry",
+                     "niche overlap", "extinction slope", "robustness"
+                     ))
+```
+
+```{r Network level metrics for Individual-based networks}
+net.level.df <- data.frame()
+
+for (i in 1:length(nets)){
+  
+  if(colnames(nets[[i]][1]) == "ind") {
+    
+    net <- nets[[i]] |> column_to_rownames("ind")
+    
+  }
+  
+  else {
+    
+    net <- nets[[i]] |> column_to_rownames("sp")
+     
+  }
+  
+  # Most bipartite metrics
+  net.level <- networklevel(net, indices)
+  
+  # Bray-Curtis niche overlap
+  net.overlap2 <- networklevel(net, "niche overlap", dist = "bray") %>% 
+    t() %>% as.data.frame() %>%
+    rename(niche.overlap.bray.HL = niche.overlap.HL ) %>%
+    rename(niche.overlap.bray.LL = niche.overlap.LL)
+  
+  # Jaccard niche overlap
+  net.overlap3 <- networklevel(net, "niche overlap", dist = "jaccard") %>%
+    t() %>% as.data.frame() %>%
+    rename(niche.overlap.jaccard.HL = niche.overlap.HL ) %>%
+    rename(niche.overlap.jaccard.LL = niche.overlap.LL)
+ 
+  # Modularity (bipartite)
+  mod <- computeModules(net)
+  M = mod@likelihood
+  
+  #Combine metrics
+  net.level <- cbind(as.data.frame(t(net.level)), net.overlap2, net.overlap3, M = M) %>%
+    mutate(net_size = number.of.species.HL * number.of.species.LL) %>%
+    mutate(net_id = str_remove(names(nets[i]), "_int_std.csv"))
+  
+  net.level.df <- rbind(net.level.df, net.level)
+}
+
+net.level.df %<>% mutate(net_n = order(net_id))
+
+glimpse(net.level.df)
+```
+
+Assortativity & centrality:
+
+```{r}
+library(igraph)
+
+metrics.igraph <- data.frame()
+
+for (i in seq_along(nets)){
+  
+  if(colnames(nets[[i]][1]) == "ind") {
+    
+    net <- nets[[i]] |> column_to_rownames("ind")
+    
+  }
+  
+  else {
+    
+    net <- nets[[i]] |> column_to_rownames("sp")
+     
+  }
+  
+  net <- as.data.frame(net)
+
+  inet <- graph_from_biadjacency_matrix(net, weighted= T,  add.names=NULL)
+  
+  assortativity = assortativity_degree(inet)
+  centr_binary = centr_eigen(inet, scale = TRUE, normalized = TRUE)$centralization
+  centr.weighted.obs <- sum(max(eigen_centrality(inet)$vector) - eigen_centrality(inet)$vector)
+  centralization.w <- centr.weighted.obs/ centr_eigen(inet)$theoretical_max
+  net_id = str_sub(str_remove(names(nets[i]), "_int_std.csv"))
+  as_calc <- cbind(net_id, assortativity, centr_binary, centralization.w)
+  
+  metrics.igraph <- rbind(metrics.igraph, as_calc)
+}
+```
+
+
+```{r}
+all.metrics <- net.level.df %>%
+  left_join(metrics.igraph, by = "net_id") %>%
+  mutate(assortativity = as.numeric(assortativity),
+         centr_binary = as.numeric(centr_binary),
+         centralization.w = as.numeric(centralization.w)) %>%
+  mutate(type = if_else(str_detect(net_id, "sp"), "sp", "ind")) %>%
+  mutate(net_id = if_else(type == "sp", str_sub(net_id, 4, 8), net_id),
+         net_code = paste0(type, "_", net_id),
+         unique.ints = connectance * net_size)
+
+glimpse(all.metrics)
+```
+
+Load net characteristics:
+
+```{r}
+nets_char <- readxl::read_xlsx(here("data/selected_networks.xlsx")) %>%
+  mutate(net_code = paste0(type, "_", code_ID)) %>%
+  dplyr::select(net_code, type, code_ID, ref, country, plant_sp, family = `focus family`)
+
+net_cols <- read_csv(here("data/net_colors.csv")) %>%
+  dplyr::select(continent, bioregion, country, plant_sp, 
+                plot_rank1, plot_rank2,
+                cols_continent1, cols_continent2, 
+                cols_continent_d1, cols_continent_d2, 
+                cols_bioregions1, cols_bioregions_d1,
+                cols_bioregions2, cols_bioregions_d2)
+
+nets_char <- nets_char |> left_join(net_cols)
+```
+
+```{r}
+all.metrics <- all.metrics |>  left_join(nets_char)
+glimpse(all.metrics)
+
+write_csv(all.metrics, here("data/net.level.selection.csv"))
+```
+

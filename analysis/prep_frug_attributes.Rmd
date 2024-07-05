@@ -16,28 +16,27 @@ library(here)
 library(tidyverse)
 library(tidylog)
 library(magrittr)
+library(reshape2)
+
+theme_set(theme_minimal())
 ```
 
 
 Load networks:
 
 ```{r}
-nets_names <- list.files(path = here("networks/standardized/"), pattern = "_int")
+nets.list <- list.files(path = here("networks/nets_std/"), pattern = "_int")
+nets.sp <- nets.list |> str_subset(pattern = "sp_")
+nets.ind <- setdiff(nets.list, nets.sp)
 
 nets <- list()
 
-for (i in 1:length(nets_names)){
-  net_file <- paste0("networks/standardized/", nets_names[[i]])
+for (i in 1:length(nets.ind)){
+  net_file <- paste0("networks/nets_std/", nets.ind[[i]])
   net <- read.csv(here(net_file))
-  
-  if(ncol(net)<2){
-    net <- read.csv(here(net_file), sep = ";") 
-  } else
-  {}  
-
   net %<>% column_to_rownames("ind")
   nets[[i]] <- net
-  names(nets)[i] <- nets_names[[i]]
+  names(nets)[i] <- nets.ind[[i]]
 }
 ```
 
@@ -46,12 +45,13 @@ Calculate aggregated interactions by bird species and define core birds:
 ```{r}
 frug.cons <- data.frame()
 
-for (i in 1:length(nets_names)){
+for (i in 1:length(nets.ind)){
+  
   tmp <- nets[[i]] %>% 
     rownames_to_column("ind") %>% 
     melt() %>%
     mutate(net_id = names(nets[i]),
-           net_id = str_sub(net_id, 3, 7)) %>%
+           net_id = str_sub(net_id, 1, 5)) %>%
     filter(value!= 0) %>%
     group_by(net_id) %>% 
     mutate(n_ind = n_distinct(ind)) %>%
@@ -62,22 +62,35 @@ for (i in 1:length(nets_names)){
     mutate(per.plants = n_plants_int/n_ind)
   
   frug.cons <- rbind(frug.cons, tmp)
+  
 }
 
-glimpse(frug.cons)
+#glimpse(frug.cons)
 ```
 
 Add network information
 
 ```{r}
-ind.level.df <- read.csv(here("data/node.level.selection.csv"))
+nets_char <- readxl::read_xlsx(here("data/selected_networks.xlsx")) %>%
+  mutate(net_code = paste0(type, "_", code_ID)) %>%
+  filter(type == "ind") %>%
+  dplyr::select(net_code, type, code_ID, ref, country, plant_sp, family = `focus family`)
 
-net_info <- ind.level.df %>% 
-  distinct(net_id, net_name, plant_sp, pop, continent, country, plant_plot_rank)
+net_cols <- read_csv(here("data/net_colors.csv")) %>%
+  dplyr::select(continent, bioregion, country, plant_sp, 
+                plot_rank1, plot_rank2,
+                cols_continent1, cols_continent2, 
+                cols_continent_d1, cols_continent_d2, 
+                cols_bioregions1, cols_bioregions_d1,
+                cols_bioregions2, cols_bioregions_d2)
 
-head(net_info)
+net_info <- nets_char |> left_join(net_cols) |> 
+  rename(net_id = code_ID)
 
-frug.cons %<>% left_join(net_info) %>%
+glimpse(net_info)
+
+frug.cons %<>% 
+  left_join(net_info) %>%
   rename(frug_sp = variable)
 
 glimpse(frug.cons)
@@ -86,7 +99,7 @@ glimpse(frug.cons)
 Number of unique animal species:
 
 ```{r}
-length(unique(frug.cons$frug_sp)) #246 frugivore species
+length(unique(frug.cons$frug_sp)) #254 frugivore species
 ```
 
 Get frugivores body mass:
@@ -149,7 +162,9 @@ frugs <- frug.cons %>%
          frug_sp_elton = ifelse(frug_sp_elton == "Oriolus kundoo", "Oriolus oriolus", frug_sp_elton),
          frug_sp_elton = ifelse(frug_sp_elton == "Geokichla citrina", "Zoothera citrina", frug_sp_elton),
          frug_sp_elton = ifelse(frug_sp_elton == "Hypsipetes ganeesa", "Hypsipetes leucocephalus", frug_sp_elton),
-         frug_sp_elton = ifelse(frug_sp_elton == "Sturnia blythii", "Sturnus malabaricus", frug_sp_elton)) %>% 
+         frug_sp_elton = ifelse(frug_sp_elton == "Sturnia blythii", "Sturnus malabaricus", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Sturnia pagodarum", "Sturnus pagodarum", frug_sp_elton),
+         frug_sp_elton = ifelse(frug_sp_elton == "Psilopogon haemacephalus", "Megalaima haemacephala", frug_sp_elton)) %>% 
   mutate(frug_sp_elton = ifelse(frug_sp_elton == "Rattus sp", "Rattus rattus", frug_sp_elton), #Doñana most common
          frug_sp_elton = ifelse(frug_sp_elton == "Ramphastos sp", "Ramphastos brevis", frug_sp_elton)) %>% #following Lamperty most observed species
   ungroup() %>% 
@@ -196,4 +211,50 @@ glimpse(frug.cons.full)
 
 write_csv(frug.cons.full, here("data/frugivores_interactions.csv"))
 ```
+
+
+##PLOTS
+
+Body mass distribution: 
+
+```{r}
+ggplot(frugs, aes(x = bmass)) + 
+  geom_histogram() + 
+  facet_wrap(~class, scales = "free")
+```
+
+```{r}
+#Net colors:
+mycols <- as.character(net_info$cols_continent1)
+names(mycols) <- as.character(net_info$plant_sp)
+
+mycols.cont <- as.character(net_info$cols_continent_d1)
+names(mycols.cont) <- as.character(net_info$continent)
+```
+
+```{r}
+frug.cons.full %>%
+  filter(!net_id %in% c("08_01", "12_01", "12_06", "12_07")) %>%
+  ungroup() %>% group_by(net_id) %>% 
+  mutate(bmass.scale = scale(bmass)) %>%
+  ggplot(aes(y = ints, color = continent, x = bmass.scale)) + 
+  scale_y_continuous(limits = c(0,1)) +
+  geom_point(alpha = 0.6) +
+  scale_color_manual(values = mycols.cont) + 
+  facet_wrap(~class, scales = "free")
+
+frug.cons.full %>%
+  filter(!net_id %in% c("08_01", "12_01", "12_06", "12_07")) %>%
+  ungroup() %>% group_by(net_id) %>% 
+  mutate(bmass.scale = scale(bmass)) %>%
+  ggplot(aes(y = ints, color = continent, x = bmass.scale)) + 
+  scale_y_continuous(limits = c(0,1)) +
+  geom_point(alpha = 0.6) +
+  scale_color_manual(values = mycols.cont) + geom_smooth()
+```
+
+
+
+
+
 

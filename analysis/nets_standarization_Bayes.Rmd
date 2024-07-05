@@ -1,0 +1,219 @@
+---
+title: "Networks standarization with posteriors"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(network.tools)
+library(patchwork)
+```
+
+```{r setup, include=FALSE}
+knitr::knit_hooks$set(timeit = local({
+  now = NULL
+  function (before, options) {
+    if (before) {
+      now <<- Sys.time()
+    } else {
+      # calculate the time difference after a chunk
+      res <- difftime(Sys.time(), now, units = "mins")
+      # return a character string to show the time
+      paste("Time for this code chunk to run:", round(res,
+        2), "minutes")
+    }
+  }})
+)
+```
+
+# Data
+
+## 1. Specify parameters:
+
+(1) network id, (2) sampling effort and (3) whether controlling for differential sampling effort in plant individuals is needed:
+
+```{r}
+params <- read_csv2(here("networks/nets_se/nets_parameters.csv")) |> 
+  filter(str_detect(net_code, "ind"))
+
+# List of individual-based networks
+net_id <- params$net_id
+
+# List of sampling effort for each individual-based networks
+se_net <- params$sampling_effort
+
+# List of whether individuals require controlling by sampling effort
+control_needed <- params$necessary_stand
+
+```
+
+## 2. Read network posterior counts:
+
+Load data resulting from Bayes model.
+
+```{r timeit=TRUE, message=FALSE, results='hide'}
+files <- list.files(here("networks/nets_post"))
+nets <- str_sub(files, 1, 5)
+#remove small nets
+nets_selec <- nets[! nets %in% c("08_01", "12_01", "12_06", "12_07")]
+
+nets <- list()
+
+for (i in 1:length(net_id)) {
+  
+  if (net_id[i] %in% nets_selec) {
+    
+    print(net_id[i])
+    
+    net.post <- readRDS(here::here(paste0("networks/nets_post/",
+                                        net_id[i],
+                                        "_post_counts.rds"))) |>
+      group_by(Plant, Animal) |>
+      mutate(iter = c(1:1000)) |>
+      mutate(net_id = net_id[i])
+
+   nets[[i]] <- net.post
+   names(nets)[i] <- net_id[i]
+  
+  }
+  else {
+  }
+}
+```
+
+
+## 3. Read info on sampling effort for each network:
+
+```{r timeit=TRUE, message=FALSE, results='hide'}
+nets.se <- list()
+
+for (i in 1:length(net_id)) {
+  
+  if (control_needed[i] == "YES") {
+    
+    print(net_id[i])
+    
+    effort <- read_csv(here::here(paste0("networks/nets_se/",
+                                         net_id[i],
+                                         "_attr.csv"))) |>
+      select(ind, SE = se_net[i]) |> 
+      mutate(Plant = as.character(ind))
+
+    nets.se[[i]] <- effort
+    names(nets.se)[i] <- net_id[i]
+  
+  }
+  else {
+  }
+}
+```
+
+
+## 4 Divide posterior counts by sampling effort and round interactions:
+
+Only if necessary controlling by sampling effort. That is, networks where sampling effort was already accounted for or where plant individuals where sampled with the same effort do not require this step.
+
+Then round interactions so that interactions under 0.5 counts are not consiredes to have happened.
+
+```{r timeit=TRUE, message=FALSE, results='hide'}
+nets.post.se <- list()
+
+for (i in 1:length(nets)) {
+  
+    if (control_needed[i] == "YES"){
+      
+      net.post.se <- nets[[i]] |> 
+        left_join(nets.se[[i]], by = "Plant") |> 
+        mutate(count_r = round(count)) |> #round posterior
+        mutate(count_se = (count_r / SE))
+      
+      nets.post.se[[i]] <- net.post.se
+      names(nets.post.se)[i] <- net_id[i]
+      
+    }
+  
+    else {
+      
+      net.post.se <- nets[[i]] |> 
+        mutate(count_r = round(count)) |> #round posterior
+        mutate(count_se = count_r)
+      
+      nets.post.se[[i]] <- net.post.se
+      names(nets.post.se)[i] <- net_id[i]
+      
+    }
+}
+```
+
+Multiply counts by 10 in network "02_01":
+
+```{r}
+nets.post.se[[3]] <- nets.post.se[[3]] |> 
+  mutate(count_r = count_r*10,
+         count_se = count_se*10)
+```
+
+
+
+## 5. Standarize matrix
+
+Refer matrix to interaction proportion by dividing all unique interaction by the total no. of interactions (a.k.a. Grand Total Standardization, GTS) - this makes them comparable.
+
+```{r, timeit=TRUE, message=FALSE, results='hide'}
+
+gts <- function(net) {
+  
+  # calculate total counts per posterior sample
+  total.count.iter <- net |> 
+    group_by(.draw) |> 
+    summarise(total = sum(count_se))
+  
+  # divide counts by total
+  net.std <- net |> 
+    left_join(total.count.iter, by = ".draw") |> 
+    mutate(count.std = count_se/total)
+  
+}
+
+# apply gts function to each network at once
+nets.std <- lapply(nets.post.se, gts)
+names(nets.std) <- names(nets.post.se)
+
+```
+
+
+## 6. Save matrices
+
+```{r timeit=TRUE, message=FALSE, results='hide'}
+
+for (i in 1:length(nets.std)) {
+  if(!is.null(nets.post.se[[i]])){
+    
+    to_save <- nets.std[[i]] |> 
+      select(iter = .draw, 
+             Plant, 
+             Animal, 
+             Visits = count.std)
+    
+    net_id <- names(nets.std)[i]
+    saveRDS(to_save, here(paste0("networks/nets_post_std/", net_id, "_int_std.rds")))
+    
+    }
+}
+```
+
+
+```{r}
+##Checking each network iteration sums 1
+#a <- readRDS(here(paste0("data/nets_post_std/", net_id, "_int_std.rds")))
+# 
+# a |> 
+#    group_by(iter) |> 
+#    summarise(sum(Visits))
+```
+
+
+

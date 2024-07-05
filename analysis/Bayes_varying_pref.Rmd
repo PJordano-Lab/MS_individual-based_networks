@@ -1,0 +1,184 @@
+---
+title: "Bayesian inference of an individual-based mutualistic network"
+subtitle: "`r params$net`"
+output: pdf_document
+# params:
+#   net: "02_01"
+#   beta: 0.01
+#   iter: 10000
+#   model: "varying_preferences"
+---
+
+## Net `r params$net`
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+net <- params$net
+```
+
+```{r pkgs, message=FALSE}
+library(BayesianNetworks)
+library(network.tools)
+library(tidyverse)
+theme_set(theme_minimal())
+options(mc.cores = 4)
+```
+
+## Data
+
+Load dataset and sampling effort per individual plant:
+
+```{r data}
+web <- readr::read_csv(here::here("networks/nets_raw", paste0(params$net, "_int.csv"))) |> 
+  arrange(ind)
+mat <- as.matrix(web[, -1])
+mat <- apply(mat, c(1,2), as.integer)
+rownames(mat) <- web$ind
+
+
+# create numeric vector of sampling effort for each plant with names = plant id
+effort <- readr::read_csv(here::here("networks/nets_se", paste0(params$net, "_attr.csv"))) |>
+  select(ind, starts_with("se_")) |>
+  filter(ind %in% web$ind) |>
+  arrange(ind)
+
+## If there is only one column with sampling effort, use it:
+if (!net %in% c("01_01", "01_02", "02_01", "02_02", "02_03", "10_01", "11_01", 
+                "15_01", "18_01", "18_02", "20_01", "21_01", "21_02")) {
+  effort <- effort |> 
+    pull(starts_with("se_"), name = "ind")
+} 
+
+# Otherwise, select sampling effort column in some specific nets:
+if (net == "10_01") {
+  effort <- effort |> 
+    mutate(se_cam_days = se_cam_h/24) |> 
+    pull(se_cam_days, name = "ind")
+}
+
+if (net == "11_01") {
+  effort <- effort |> 
+    mutate(se_cam_months = se_cam_days/30) |> 
+    pull(se_cam_months, name = "ind")
+}
+
+if (net == "15_01") {
+  effort <- effort |> 
+    mutate(se_cam_months = se_cam_days/30) |> 
+    pull(se_cam_months, name = "ind")
+}
+
+if (net %in% c("18_01", "18_02", "20_01")) {
+  effort <- effort |> 
+    mutate(se_bc_months = se_bc_days/30) |> 
+    pull(se_bc_months, name = "ind")
+}
+
+if (net %in% c("21_01", "21_02")) {
+  effort <- effort |> 
+    pull(se_obs_h, name = "ind")
+}
+
+# For Pistacia and Juniperus, use constant sampling effort
+if (net %in% c("01_01", "01_02", "02_01", "02_02", "02_03")) {
+  effort <- rep(10, nrow(mat))
+  names(effort) <- web$ind
+}
+
+## Some nets may require adjusting of the count data or effort values 
+if (net %in% c("02_01")) {
+  mat <- mat/10  # divide counts by 10 to make modelling feasible
+  mat[mat > 0 & mat < 1] <- 1  # don't miss rare counts
+  mat <- round(mat)
+  mat <- apply(mat, c(1,2), as.integer)
+}
+
+stopifnot(identical(length(effort), nrow(mat)))
+stopifnot(identical(names(effort), rownames(mat)))
+
+# summary(mat)
+summary(as.numeric(mat))
+# if (max(mat) > 1000) {
+#   stop("More than 1000 counts in some cell(s)")
+# }
+
+summary(effort)
+if (max(effort) > 500) {
+  stop("Sampling effort > 500 for some plants")
+}
+```
+
+
+
+## Bayesian inference of network structure
+
+```{r model}
+
+dt <- prepare_data(mat, sampl.eff = effort) 
+
+beta <- params$beta
+
+plot_prior(beta)
+
+fit <- fit_model(dt, 
+                 refresh = 0,
+                 beta = beta,
+                 model = params$model,
+                 # max_treedepth = 15,
+                 # init = function() list(r = runif(1, 0, 20000)),
+                 iter_warmup = params$iter, 
+                 iter_sampling = params$iter, 
+                 thin = 4 * params$iter / 1000)
+
+get_seed(fit)
+check_model(fit, data = dt)
+```
+
+
+
+
+## Posteriors
+
+Get posterior distributions:
+
+```{r get_posterior}
+post <- get_posterior(fit, dt)
+
+head(post)
+```
+
+Mean edge probability:
+
+```{r edge_probability, out.width="100%"}
+plot_interaction_prob(post)
+```
+
+## Generate predicted visits for each pairwise interaction
+
+```{r predict_counts, message=FALSE, echo=1}
+post.counts <- predict_counts(fit, dt)
+```
+
+Compare observed and predicted visits by the model:
+
+```{r plot_obs_pred, out.width="100%"}
+p <- plot_counts_pred(post.counts, sort = FALSE)
+o <- plot_counts_obs(mat, sort = FALSE, zero.na = FALSE)
+library(patchwork)
+p + o
+```
+
+```{r plot_calibration, out.width = '100%'}
+plot_counts_pred_obs(post.counts, dt)
+```
+
+
+```{r plot_calibration_indiv, out.width = '100%', fig.height=8}
+plot_counts_pred_obs(post.counts, dt, byplant = TRUE, scales = "free")
+```
+
+```{r}
+saveRDS(post.counts, here::here(paste0("networks/nets_post/", params$net, "_post_counts.rds")))
+```
+

@@ -1,0 +1,271 @@
+---
+title: "Individual specialization (WIC/TNW) using network posteriors"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::knit_hooks$set(timeit = local({
+  now = NULL
+  function(before, options) {
+    if (before) {
+      now <<- Sys.time()
+    } else {
+      # calculate the time difference after a chunk
+      res <- difftime(Sys.time(), now, units = "mins")
+      # return a character string to show the time
+      paste("Time for this code chunk to run:", round(res,
+        2), "minutes")
+    }
+  }})
+)
+```
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(network.tools)
+library(ggdist)
+library(ggridges)
+
+theme_set(theme_bw())
+```
+
+
+## Data
+
+Read network posteriors:
+
+```{r}
+files <- list.files(here("networks/nets_post_std"))
+
+nets <- list()
+
+for (i in 1:length(files)) {
+  net.post <- readRDS(here::here(paste0("networks/nets_post_std/", files[i]))) |> 
+    mutate(net_id = str_sub(files[i], 1, 5))
+
+  nets[[i]] <- net.post
+  names(nets)[i] <- str_sub(files[i], 1, 5)
+}
+
+```
+
+## Calculate WIC/TNW metric
+
+Using Shannon approximation
+
+```{r eval=FALSE, timeit = TRUE}
+mytime <- Sys.time()
+
+ind.spec <- data.frame()
+
+for (i in 1:length(nets)) {
+  
+  print(names(nets[i]))
+  
+  for (j in 1:1000) {
+    
+    net <- nets[[i]] |> 
+      filter(iter == j) 
+   
+    mat <- long2wide(net) 
+    
+    ind.sp <- indiv_spec(mat)
+    
+    tmp <- data.frame(net_id = names(nets)[i],
+                      iter = j,
+                      WIC = ind.sp$WIC,
+                      TNW = ind.sp$TNW,
+                      WIC.TNW = ind.sp$IndSpec)
+  
+    ind.spec <- rbind(ind.spec, tmp)
+  }
+}
+
+Sys.time()-mytime
+```
+
+```{r eval=FALSE}
+saveRDS(ind.spec, here("metrics/WIC_TNW_posts.rds"))
+```
+
+
+Read dataset:
+
+```{r}
+ind.spec <- readRDS(here("data/WIC_TNW_posts.rds"))
+```
+
+```{r}
+summarytools::dfSummary(ind.spec)
+
+summarytools::descr(ind.spec$WIC.TNW)
+
+ind.spec |> 
+  summarise(bayestestR::ci(WIC.TNW, ci = 0.90))
+```
+
+
+Load colors:
+
+```{r include=FALSE, message=FALSE}
+net_cols <- read_csv(here("data/net_colors.csv"))
+
+cols.bio <- as.character(net_cols$cols_bioregions2)
+names(cols.bio) <- as.character(net_cols$plant_sp)
+
+cols.bio.d <- as.character(net_cols$cols_bioregions_d2)
+names(cols.bio.d) <- as.character(net_cols$bioregion)
+```
+
+Load additional info:
+
+```{r include=FALSE, message=FALSE}
+ind_nets_ID <- read.csv(here("data/net.level.selection.csv")) |> 
+  filter(type == "ind") |> 
+  select(net_id, net_n, net_code, code_ID, ref, 
+         family, plant_sp, bioregion, continent,
+         plot_rank1, plot_rank2, 
+         number.of.species.HL, number.of.species.LL)
+```
+
+Create rank for later ploting:
+
+```{r}
+rank <- ind.spec |> 
+  left_join(ind_nets_ID)|> 
+  # extract order to plot (1st continent, then WIC.TNW)
+  group_by(continent, bioregion, net_id) |> 
+  summarise(mean.WT = mean(WIC.TNW)) |> 
+  arrange(continent, mean.WT) |> 
+  ungroup() |> 
+  mutate(rank_cont = 1:n()) |> 
+  arrange(desc(bioregion), mean.WT) |> 
+  mutate(rank_bio = 1:n())
+```
+
+Add network info to dataset:
+
+```{r}
+ind.spec2 <- ind.spec |> 
+  left_join(rank) |> 
+  left_join(ind_nets_ID)
+```
+
+
+## MODEL
+
+```{r}
+library(glmmTMB)
+library(DHARMa)
+
+hist(ind.spec2$WIC.TNW)
+hist(log(ind.spec2$WIC.TNW))
+
+m1 <- glmmTMB(WIC.TNW ~ bioregion + 
+                number.of.species.HL + 
+                number.of.species.LL + 
+                (1|net_id), 
+              family = gaussian,
+              data = ind.spec2)
+
+summary(m1)
+
+simulateResiduals(m1, plot = TRUE)
+
+library(modelbased)
+
+estimate_contrasts(m1, contrast = "bioregion")
+
+region_aov <- aov(WIC.TNW ~ bioregion, data = ind.spec2)
+summary(region_aov)
+
+```
+
+
+## PLOTS
+
+Plot WIC/TNW:
+
+```{r message=FALSE}
+ind.spec.sum <- ind.spec2 |> 
+  group_by(net_id, net_code, net_n, continent, bioregion, plant_sp) |> 
+  summarise(rank_cont = first(rank_cont),
+            rank_bio = first(rank_bio),
+            WIC.TNW = mean(WIC.TNW)) 
+  
+ggplot(ind.spec2, aes(y = fct_reorder(as.character(net_n), rank_bio, .fun = mean), 
+                      x = WIC.TNW, 
+                      color = plant_sp, 
+                      fill = plant_sp, 
+                      label = net_n)) +
+  stat_pointinterval(.width = c(0.6, 0.9), point_interval = "mean_qi", 
+                     point_size = 3,
+                     pch = 21, point_color = "grey20",
+                     stroke = 0.5) + 
+  geom_text(data = ind.spec.sum,
+            aes(y = fct_reorder(as.character(net_n), rank_bio),
+                x = WIC.TNW, color = plant_sp,
+                label = net_n),
+            inherit.aes = FALSE,
+            nudge_x = -0.02, 
+            nudge_y = 0.6,
+            size = 3) +
+  scale_color_manual(values = cols.bio) + 
+  scale_fill_manual(values = cols.bio) + 
+  theme(legend.position = "none",
+        axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(),
+        panel.background = element_rect(colour = "black")) + 
+  labs(x = NULL, y = NULL) +
+  scale_x_continuous(limits = c(0,1)) +
+  scale_y_discrete(expand = c(0.05,0))
+
+#ggsave(here("figs/figs_rev1/Fig_3_WIC_TNW2.pdf"), width = 8, height = 5)
+```
+
+
+```{r}
+ind.spec2 |> 
+  group_by(net_id, continent, bioregion, plant_sp, net_n) |> 
+  summarise(WIC = mean(WIC), TNW = mean(TNW), n_frug = first(number.of.species.HL)) |> 
+  ggplot(aes(x = TNW, y = WIC, 
+             fill = bioregion, 
+             size = n_frug)) + 
+  geom_point(shape = 21, color = "grey20") +
+  ggrepel::geom_text_repel(aes(label = net_n), size = 2) + 
+  scale_fill_manual(values = cols.bio.d) + 
+  theme(#legend.position = "none",
+        panel.border = element_rect(linewidth = 0.5, fill = NA)) + 
+  geom_abline(slope = 1, linetype = 3) +
+  scale_y_log10() + scale_x_log10() +
+  labs(y = "WIC", x  = "TNW", size = "No. frugivores", color = "Region", fill = "Region") 
+
+#ggsave(here("figs/figs_rev1/Fig_S_WIC_vs_TNW_log.pdf"), width = 7, height = 5)
+```
+
+
+```{r}
+sum <- ind.spec2 |> 
+  group_by(net_id, continent, bioregion, plant_sp, net_n) |> 
+  summarise(WIC = mean(WIC), TNW = mean(TNW), n_frug = first(number.of.species.HL)) 
+  
+ggplot(sum, aes(x = TNW, y = WIC, 
+             fill = bioregion, 
+             size = n_frug)) + 
+  geom_point(data = ind.spec2, inherit.aes = FALSE,
+             aes(x = TNW, y = WIC, color = bioregion), alpha = .02) +
+  geom_point(shape = 21, color = "grey20") +
+  ggrepel::geom_text_repel(aes(label = net_n), size = 2) + 
+  scale_fill_manual(values = cols.bio.d) + 
+  scale_color_manual(values = cols.bio.d) + 
+  theme(#legend.position = "none",
+        panel.border = element_rect(linewidth = 0.5, fill = NA)) + 
+  geom_abline(slope = 1, linetype = 3) +
+  scale_y_log10() + scale_x_log10() +
+  labs(y = "WIC", x  = "TNW", size = "No. frugivores", color = "Region", fill = "Region") 
+```
+
+

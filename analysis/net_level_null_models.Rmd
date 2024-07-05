@@ -1,0 +1,175 @@
+---
+title: "Null model network comparisons"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r include = F}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(magrittr)
+library(bipartite)
+library(igraph)
+library(tnet)
+```
+
+
+## NULL MODELS
+
+Read matrices:
+
+I use ceiling function to round the minimum interaction to 1. 
+
+```{r eval = FALSE}
+#Read list of names
+
+net_names <- list.files(path = here("networks/nets_std"), pattern = "_int")
+
+#Create empty list
+
+nets <- list()
+
+#Add all read files to the list
+
+for (i in 1:length(net_names)){
+  
+  net_file <- paste0("networks/nets_std/", net_names[[i]])
+  net <- read.csv(here(net_file))
+  
+  if (str_detect(net_names[i], "sp_")) {
+    
+    net %<>% column_to_rownames("sp")
+    
+  }
+  
+  else {
+    
+    net %<>% column_to_rownames("ind")
+    
+  }
+  
+  net <- ceiling(net)
+  
+  nets[[i]] <- net #add to list
+  names(nets)[i] <- net_names[[i]] #name the list
+  
+}
+
+```
+
+
+Generate 1000 random nets following Patefield's algorithm (keeps constant marginal rows and columns)
+
+```{r eval = FALSE}
+null.list <- list()
+
+for (i in 1:length(nets)) {
+  
+  print(i)
+  
+  nulls <- nullmodel(nets[[i]], N = 1000, method = "r2dtable")
+  
+  null.list <- append(null.list, list(nulls))
+  
+  names(null.list)[[i]] <- names(nets)[i]
+  
+}
+```
+
+
+Network level metrics:
+
+```{r eval=FALSE}
+indices <- as.list(c("number of species",
+                     "connectance", 
+                     "weighted NODF",
+                     "interaction evenness", 
+                     "Alatalo interaction evenness"))
+```
+
+
+```{r eval = FALSE}
+pb = txtProgressBar(min = 0, max = length(nets), style = 3) 
+
+web.metrics <- data.frame()
+
+for (i in 1:length(null.list)) {
+  
+  net_nulls <- null.list[[i]]
+  
+  for (j in 1:1000) {
+    
+    m.bipart <- networklevel(net_nulls[[j]], indices)
+    m.bipart <- as.data.frame(t(m.bipart))  
+    
+    # Modularity (bipartite)
+    mod <- computeModules(net_nulls[[j]])
+    M = mod@likelihood
+    
+    # Igraph metrics
+    inet <- graph_from_biadjacency_matrix(net_nulls[[j]], weighted = T,  add.names=NULL)
+    assortativity = assortativity_degree(inet)
+    eigen.centrality = eigen_centrality(inet)$value
+    centr_binary = centr_eigen(inet, scale = TRUE, normalized = TRUE)$centralization
+    centr.weighted.obs = sum(max(eigen_centrality(inet)$vector) - eigen_centrality(inet)$vector)
+    centralization.w = centr.weighted.obs/ centr_eigen(inet)$theoretical_max
+    igraph.metrics <- cbind(assortativity, eigen.centrality, centr_binary, centralization.w)
+    
+    #merge all metrics
+    metrics.nulls <- cbind(m.bipart, M, igraph.metrics) |> 
+      select_all(~gsub("\\s+", ".", .)) |> 
+      mutate(net_size = number.of.species.HL * number.of.species.LL) |> 
+      mutate(iter = j) 
+    
+    if (str_detect(names(null.list)[i], "_int")) {
+      
+      metrics.nulls <- metrics.nulls |> 
+        mutate(type = "ind",
+               net_id = str_sub(names(null.list)[i], 1, 5))
+      
+    }
+    
+    else {
+      
+      metrics.nulls <- metrics.nulls |> 
+        mutate(type = "sp",
+               net_id = str_sub(names(null.list)[i], 4, 8))
+      
+    }
+    
+    web.metrics <- rbind(web.metrics, metrics.nulls)
+    
+  }
+
+   setTxtProgressBar(pb,i)
+  
+}
+
+
+web.metrics <- web.metrics |> 
+  relocate(type, .before = everything()) |> 
+  relocate(net_id, .after = type) |> 
+  relocate(iter, .after = net_id) |> 
+  mutate(net_code = paste0(type, "_", net_id)) |> 
+  group_by(iter) |> 
+  mutate(net_n = order(net_code))
+
+glimpse(web.metrics)
+```
+
+
+```{r eval = FALSE}
+saveRDS(web.metrics, here("data/net_level_nulls.rds"))
+```
+
+

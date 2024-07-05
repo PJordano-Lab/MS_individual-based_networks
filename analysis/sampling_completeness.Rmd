@@ -27,16 +27,16 @@ Load colors and other attributes:
 ```{r}
 net_cols <- read_csv(here("data/net_colors.csv"))
 
-cols.plants <- as.character(net_cols$cols_continent3)
+cols.plants <- as.character(net_cols$cols_bioregions2)
 names(cols.plants) <- as.character(net_cols$plant_sp)
 
-cols.cont <- as.character(net_cols$cols_continent4)
-names(cols.cont) <- as.character(net_cols$continent)
+cols.bio <- as.character(net_cols$cols_bioregions_d2)
+names(cols.bio) <- as.character(net_cols$bioregion)
 
 nets_info <- read_csv(here("data/net.level.selection.csv")) %>%
   left_join(net_cols) %>%
   filter(type == "ind") %>%
-  select(-c(connectance:centralization.w, cols_country:cols_continent4)) %>%
+  select(-c(connectance:centralization.w)) %>%
   rename(net_id = code_ID)
 
 glimpse(nets_info)
@@ -47,20 +47,15 @@ Read all networks:
 
 ```{r}
 #Read list of names
-nets_names <- list.files(path = here("networks/"), pattern = "_int")
+nets_names <- list.files(path = here("networks/nets_raw/"), pattern = "_int")
 
 #Create empty list
 nets <- list()
 
 #Add all read files to the list
 for (i in 1:length(nets_names)){
-  net_file <- paste0("networks/", nets_names[[i]])
+  net_file <- paste0("networks/nets_raw/", nets_names[[i]])
   net <- read.csv(here(net_file))
-  
-  if(ncol(net)<2){
-    net <- read.csv(here(net_file), sep = ";") #For those datasets saved with ; separation
-  } else
-  {}  
 
   net %<>% mutate(ind = as.factor(ind))#column_to_rownames("ind")
   nets[[i]] <- net #add to list
@@ -157,7 +152,8 @@ write_csv(sc, here("data/sampling_coverage_inext.csv"))
 ```{r}
 ggplot(sc, aes(x = SC, fill = plant_sp)) + 
   geom_histogram() + 
-  scale_fill_manual(values = cols.plants)
+  scale_fill_manual(values = cols.plants) + 
+  theme(legend.position = "bottom")
 ```
 
 
@@ -214,11 +210,11 @@ for (i in 1:length(unique(nets.melted$study_n))){
 
 Save all plots to a pdf (several plots per page)
 ```{r}
-# ggsave(
-#    filename = "figs/sampling_coverage.pdf", 
-#    plot = gridExtra::marrangeGrob(plot_list, nrow=5, ncol=2),
-#    width = 10, height = 15
-# )
+ggsave(
+   filename = "figs/sampling_coverage.pdf",
+   plot = gridExtra::marrangeGrob(plot_list, nrow=5, ncol=2),
+   width = 10, height = 15
+)
 ```
 
 
