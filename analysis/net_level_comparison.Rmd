@@ -55,33 +55,22 @@ metrics.of.interest <- c("connectance",
 Summarize null model metrics:
 
 ```{r}
+obs.metrics.long <- net.level |> 
+  select(net_id, net_n, net_size, type_long = type, all_of(metrics.of.interest)) |> 
+  pivot_longer(cols = -c(1:4), names_to = "metric", values_to = "value_obs") |> 
+  mutate(type = ifelse(type_long == "ind-based", "ind", "sp"))
+#630 observations
+
 null.data.sum <- nulls |> 
-  group_by(net_code) |> 
-  summarise_at(c("connectance", 
-                 "weighted.NODF", 
-                 "assortativity", 
-                 "interaction.evenness",
-                 "M", 
-                 "Alatalo.interaction.evenness", 
-                 "centralization.w"), 
-               c("mean", "sd"))
-```
+  select(type, net_id, iter, all_of(metrics.of.interest)) |> 
+  pivot_longer(cols = -c(1:3), names_to = "metric", values_to = "value") |> 
+  group_by(type, net_id, metric) |> 
+  summarise(mean_nulls = mean(value),
+            sd_nulls = sd(value)) |> 
+  left_join(obs.metrics.long) |> 
+  mutate(z_score = (value_obs - mean_nulls) / sd_nulls,
+         diff_nulls = (value_obs - mean_nulls))
 
-
-```{r}
-df <- net.level |> 
-  select(net_code, type, net_id, net_n, net_size, all_of(metrics.of.interest), Alatalo.interaction.evenness)|> 
-  #mutate(source = "observed") |> 
-  left_join(null.data.sum, by = "net_code") |> 
-  rowwise() |> 
-  mutate(zs_connectance = (connectance - connectance_mean) / connectance_sd,
-         zs_weighted.NODF = (weighted.NODF - weighted.NODF_mean) / weighted.NODF_sd,
-         zs_assortativity = (assortativity - assortativity_mean) / assortativity_sd,
-         zs_M = (M - M_mean) / M_sd,
-         zs_Alatalo.interaction.evenness = (Alatalo.interaction.evenness - Alatalo.interaction.evenness_mean) / Alatalo.interaction.evenness_sd,
-         zs_interaction.evenness = (interaction.evenness - interaction.evenness_mean) / interaction.evenness_sd,
-         zs_centralization.w = (centralization.w - centralization.w_mean) / centralization.w_sd ) #|> 
-  #filter(net_code != "sp_09_01")
 ```
 
 Convert null to long format:
@@ -101,7 +90,7 @@ plot.fun <- function(x) {null.metrics.long |>
   ggplot(aes(x = value, fill = type)) +
   #geom_density(alpha = 0.5) +
   geom_histogram() +
-  scale_fill_manual(values = c("black", "grey50")) +
+  scale_fill_manual(values = c("grey20", "grey80")) +
   theme(legend.position = "none",
         axis.text.y = element_blank()) +
   labs(y = NULL, x = NULL, title =  {{x}}) + 
@@ -118,88 +107,68 @@ plot.fun("connectance")
 
 
 ```{r fig.width = 10, fig.height = 5}
-obs.metrics.long <- df |> 
-  select(net_code, net_n, net_size, type, all_of(metrics.of.interest)) |> 
-  pivot_longer(cols = -c(1:4), names_to = "metric", values_to = "value")
-#630 observations
-
-zs.long <- df |> 
-  select(net_code, net_n,  net_size, type, starts_with("zs")) |> 
-  select(-c(zs_Alatalo.interaction.evenness)) |> 
-  pivot_longer(cols = -c(1:4), names_to = "metric", values_to = "value") |> 
-  mutate(metric = str_replace(metric, "zs_", ""))
-#630 observations
-```
-
-
-```{r fig.width = 10, fig.height = 5}
-p1 <- ggplot(obs.metrics.long, aes(x = value, fill = type)) + 
+null.data.sum <- null.data.sum |> 
+  mutate(metric = recode(metric, 
+                         "M" = "Modularity",
+                         "assortativity" = "Assortativity",
+                         "centralization.w" = "Centralization",
+                         "connectance" = "Connectance",
+                         "interaction.evenness" = "Interaction evenness",
+                         "weighted.NODF" = "Weighted NODF")) 
+  
+p1 <- null.data.sum |> 
+  ggplot(aes(x = value_obs, fill = type_long)) + 
   geom_density(alpha = 0.5) + 
   facet_wrap(~metric, scales = "free", nrow = 1) + 
-  #scale_fill_manual(values = c("black", "grey70")) +
-  #scale_fill_manual(values = c("#F6CF71", "#66C5CC")) +
-  scale_fill_manual(values = c("grey40", "#2F8AC4")) +
+  scale_fill_manual(values = c("grey10", "grey80")) +
+  #scale_fill_manual(values = c("grey40", "#2F8AC4")) +
   theme(panel.background = element_rect(colour = "black"),
         axis.text.y = element_blank(),
         panel.grid.minor = element_blank(),
         panel.grid.major.y = element_blank()) + 
-  labs(y = NULL, x = NULL, title = "Observed values",
+  labs(y = NULL, x = NULL, title = "A. Observed values",
        color = "Netwok n\type", fill = "Network \ntype")
 
-p2 <- zs.long |> 
-  ggplot(aes(x = value, fill = type)) + 
+p2 <- null.data.sum |> 
+  ggplot(aes(x = diff_nulls, fill = type)) + 
   geom_density(alpha = 0.5) + 
   facet_wrap(~metric, scales = "free", nrow = 1) + 
-  #scale_fill_manual(values = c("black", "grey70")) +
-  #scale_fill_manual(values = c("#F6CF71", "#66C5CC")) +
-  scale_fill_manual(values = c("grey40", "#2F8AC4")) +
+  scale_fill_manual(values = c("grey10", "grey80")) +
+  #scale_fill_manual(values = c("grey40", "#2F8AC4")) +
   theme(legend.position = "none",
         axis.text.y = element_blank(), 
         panel.background = element_rect(colour = "black"), 
         strip.background = element_rect(colour = "white"),
         panel.grid.minor = element_blank(),
         panel.grid.major.y = element_blank()) + 
-  labs(y = NULL, x = NULL, title = "Null models z-scores")
-
-p3 <- null.metrics.long |> 
-  ggplot(aes(x = value, fill = type)) + 
-  geom_density(alpha = 0.5) + 
-  facet_wrap(~metric, scales = "free", nrow = 1) + 
-  #scale_fill_manual(values = c("black", "grey70")) +
-  #scale_fill_manual(values = c("#F6CF71", "#66C5CC")) +
-  scale_fill_manual(values = c("grey40", "#2F8AC4")) +
-  theme(legend.position = "none",
-        axis.text.y = element_blank(), 
-        panel.background = element_rect(colour = "black"), 
-        strip.background = element_rect(colour = "white"),
-        panel.grid.minor = element_blank(),
-        panel.grid.major.y = element_blank()) + 
-  labs(y = NULL, x = NULL, title = "Null models")
-
-p1 / p3 + plot_layout(guides = "collect")
-
-#ggsave(here("figs/figs_rev1/Fig_2_panels_A.pdf"), width = 10, height = 5)
+  labs(y = NULL, x = NULL, title = "B. Deviation from null models")
 
 p1 / p2 + plot_layout(guides = "collect")
 
-#ggsave(here("figs/figs_rev1/Fig_2_panels_B.pdf"), width = 10, height = 5)
+#ggsave(here("figs/figs_rev1/Fig_2_panels.pdf"), width = 9, height = 7)
 
 ```
 
-Nets with higher z-score in weigthed NODF
+
+Summary metrics:
 
 ```{r}
-zs.long |>
-  filter(metric == "weighted.NODF") |>
-  filter(value >= 10)
-  arrange(desc(value))
-```
+sum.tb <- null.data.sum |> 
+  group_by(metric, type) |> 
+  summarise(obs_mean = round(mean(value_obs), 2),
+            obs_sd = round(sd(value_obs), 2),
+            nulls_mean = round(mean(mean_nulls), 2),
+            nulls_sd = round(mean(sd_nulls), 2),
+            nulls_diff = round(mean(diff_nulls), 2),
+            nulls_diff_sd = round(sd(diff_nulls), 2),
+            nulls_zs = round(mean(z_score), 2)) |> 
+  mutate(obs = paste0(obs_mean, " ± ", obs_sd),
+         nulls = paste0(nulls_mean, " ± ", nulls_sd),
+         diff = paste0(nulls_diff, " ± ", nulls_diff_sd)) |> 
+  select(metric, type, obs, nulls, diff)
 
-Summary observed metrics:
+sum.tb
 
-```{r}
-obs.metrics.long |> 
-  group_by(type, metric) |> 
-  summarise(mean(value))
+#write_csv(sum.tb, here("tables/net_metrics_summary.csv"))
 ```
 
