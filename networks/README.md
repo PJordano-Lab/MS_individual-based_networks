@@ -1,13 +1,3 @@
----
-title: "README"
-author: "Elena Quintero"
-date: "`r Sys.Date()`"
-output: html_document
-editor_options: 
-  markdown: 
-    wrap: 72
----
-
 # Plant-frugivore interaction networks compilation
 
 For this study, we compiled studies on frugivory ecological networks
@@ -35,7 +25,7 @@ individual-based networks and 59 are species-based networks
 
 ### Folder estructure
 
-This folder contains several sub-folders with the following information:
+This folder contains six sub-folders with the following information:
 
 1)  **nets_raw** - contains raw interaction counts from the original
     individual-based network studies.
@@ -52,21 +42,21 @@ This folder contains several sub-folders with the following information:
     that each interaction represents a proportion from the total
     interaction count, therefore the sum of all interactions equals 1.
     These nets are generated as output from the code
-    "nets_standarization.Rmd".
+    “nets_standarization.Rmd”.
 
 5)  **nets_post** - contains 1000 posterior distribution counts for each
     individual-based network reconstructed using a Bayesian-framework
     that accounts for differential sampling effort and interaction
     uncertainty. These nets are generated as output from the code
-    "Bayes_varying_pref.Rmd".
+    “Bayes_varying_pref.Rmd”.
 
 6)  **nets_post_std** - contains individual-based networks posteriors
     controlled by sampling effort and standardized to proportions. These
     nets are generated as output from the code
-    "nets_standarization_Bayes.Rmd".
+    “nets_standarization_Bayes.Rmd”.
 
 The name of each file comprises **two numbers** separated by a dash
-"\_", first number indicates the study and second number the population
+“\_”, first number indicates the study and second number the population
 (in case there is more than one). Study and population numbers
-identifiers are provided in "selected_individual_networks.xlsx" and in
+identifiers are provided in “selected_individual_networks.xlsx” and in
 [list_nets_full_ref.pdf](list_nets_full_ref.pdf) .
