@@ -173,13 +173,16 @@ calc.cluster <- function (iter) {
               center = TRUE,
               scale. = TRUE)
     
+    info <- iter |> 
+      dplyr::select(net_ind, net_id, iter, metrics.pca)
+    
     pca_values <- pca_id[["x"]] |> 
       as.data.frame() |> 
       cbind(net_ind = iter$net_ind) |> 
       cbind(group) |> 
       cbind(assig.prob) |> 
       relocate(net_ind, .before = everything()) |> 
-      left_join(iter, by = "net_ind")
+      left_join(info, by = "net_ind")
   
 }
 ```
