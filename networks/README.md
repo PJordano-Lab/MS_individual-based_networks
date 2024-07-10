@@ -12,7 +12,7 @@ studies with different Mediterranean species (n = 9).
 Please note that some of the studies selected present more than one
 network from different communities (in species-based studies) or
 populations (in individual-based studies), see file
-[list_nets_full_ref.pdf](list_nets_full_ref.pdf) for the origin and
+[list_nets_full_ref.pdf](../list_nets_full_ref.pdf) for the origin and
 basic information of each network. Data is entered as adjacency
 matrices, where rows represent plant species (or individuals) and
 columns represent animal species. When possible we referred the
@@ -59,4 +59,4 @@ The name of each file comprises **two numbers** separated by a dash
 “\_”, first number indicates the study and second number the population
 (in case there is more than one). Study and population numbers
 identifiers are provided in “selected_individual_networks.xlsx” and in
-[list_nets_full_ref.pdf](list_nets_full_ref.pdf) .
+[list_nets_full_ref.pdf](../list_nets_full_ref.pdf) .
