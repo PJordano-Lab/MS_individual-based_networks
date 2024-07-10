@@ -92,10 +92,29 @@ saveRDS(ind.spec, here("metrics/WIC_TNW_posts.rds"))
 ```
 
 
+Get number of plants and frugivores per iteration:
+
+```{r}
+nums <- function(net) {
+  df <- net |> 
+      filter(Visits != 0) |> 
+      group_by(iter) |> 
+      summarise(plants = n_distinct(Plant),
+                frugs = n_distinct(Animal),
+                net_id = first(net_id))
+}
+
+mynum <- lapply(nets, nums)
+
+numbers <- bind_rows(mynum)
+```
+
+
 Read dataset:
 
 ```{r}
-ind.spec <- readRDS(here("data/WIC_TNW_posts.rds"))
+ind.spec <- readRDS(here("data/WIC_TNW_posts.rds")) |> 
+  left_join(numbers)
 ```
 
 ```{r}
@@ -158,30 +177,70 @@ ind.spec2 <- ind.spec |>
 ## MODEL
 
 ```{r}
+ind.spec.sum <- ind.spec2 |> 
+  group_by(net_id, bioregion) |> 
+  summarise(WIC = mean(WIC),
+            TNW = mean(TNW),
+            plants = mean(plants),
+            frugs = mean(frugs)) 
+
 library(glmmTMB)
 library(DHARMa)
 
-hist(ind.spec2$WIC.TNW)
-hist(log(ind.spec2$WIC.TNW))
+hist(ind.spec2$WIC)
+hist(ind.spec2$TNW)
+```
 
-m1 <- glmmTMB(WIC.TNW ~ bioregion + 
-                number.of.species.HL + 
-                number.of.species.LL + 
+1. Correlation TNW and number of frugivores
+
+```{r}
+cor.test(ind.spec.sum$TNW, ind.spec.sum$frugs)
+```
+
+2. Relation WIC ~ TNW (log-log)
+
+```{r}
+m2 <- glmmTMB(log(WIC) ~ log(TNW) +
+                (1|net_id) + (1|ref), 
+              family = gaussian,
+              data = ind.spec2)
+
+# m2 <- glmmTMB(log(WIC) ~ log(TNW), 
+#               family = gaussian,
+#               data = ind.spec.sum)
+
+summary(m2)
+simulateResiduals(m2, plot = TRUE)
+```
+
+3. Differences in WIC/TNW between bioregions
+
+```{r}
+m3 <- glmmTMB(WIC.TNW ~  
+                bioregion +
+                (1|net_id) + (1|ref), 
+              family = gaussian,
+              data = ind.spec2)
+
+summary(m3)
+simulateResiduals(m3, plot = TRUE)
+
+library(modelbased)
+
+estimate_means(m3, contrast = "bioregion", ci = .90)
+```
+
+4. Differences in TNW between bioregions
+
+```{r}
+m4 <- glmmTMB(TNW ~  
+                bioregion +
                 (1|net_id), 
               family = gaussian,
               data = ind.spec2)
 
-summary(m1)
-
-simulateResiduals(m1, plot = TRUE)
-
-library(modelbased)
-
-estimate_contrasts(m1, contrast = "bioregion")
-
-region_aov <- aov(WIC.TNW ~ bioregion, data = ind.spec2)
-summary(region_aov)
-
+summary(m4)
+simulateResiduals(m4, plot = TRUE)
 ```
 
 
@@ -212,18 +271,19 @@ ggplot(ind.spec2, aes(y = fct_reorder(as.character(net_n), rank_bio, .fun = mean
             inherit.aes = FALSE,
             nudge_x = -0.02, 
             nudge_y = 0.6,
-            size = 3) +
+            size = 2.5) +
   scale_color_manual(values = cols.bio) + 
   scale_fill_manual(values = cols.bio) + 
   theme(legend.position = "none",
         axis.text.y = element_blank(), 
         axis.ticks.y = element_blank(),
-        panel.background = element_rect(colour = "black")) + 
+        panel.background = element_rect(colour = "black"),
+        axis.text.x = element_text(size = 12)) + 
   labs(x = NULL, y = NULL) +
   scale_x_continuous(limits = c(0,1)) +
   scale_y_discrete(expand = c(0.05,0))
 
-#ggsave(here("figs/figs_rev1/Fig_3_WIC_TNW2.pdf"), width = 8, height = 5)
+ggsave(here("figs/Fig_3_WIC_TNW.pdf"), width = 8, height = 5)
 ```
 
 
@@ -243,14 +303,14 @@ ind.spec2 |>
   scale_y_log10() + scale_x_log10() +
   labs(y = "WIC", x  = "TNW", size = "No. frugivores", color = "Region", fill = "Region") 
 
-#ggsave(here("figs/figs_rev1/Fig_S_WIC_vs_TNW_log.pdf"), width = 7, height = 5)
+ggsave(here("figs/Fig_S3_WIC_vs_TNW_log.pdf"), width = 7, height = 5)
 ```
 
 
 ```{r}
 sum <- ind.spec2 |> 
   group_by(net_id, continent, bioregion, plant_sp, net_n) |> 
-  summarise(WIC = mean(WIC), TNW = mean(TNW), n_frug = first(number.of.species.HL)) 
+  summarise(WIC = mean(WIC), TNW = mean(TNW), n_frug = mean(frugs)) 
   
 ggplot(sum, aes(x = TNW, y = WIC, 
              fill = bioregion, 

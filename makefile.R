@@ -6,13 +6,11 @@ library(rmarkdown)
 
 # Control networks by sampling effort and standardize networks
 # (both for species-based and individual-based)
-
 render("analysis/nets_standarization.Rmd")
 
 # FOR INDIVIDUAL-BASED NETWORKS:
 
 # Bayesian modelling of interaction counts
-
 nets <- list.files(here::here("networks/nets_raw"), pattern = "int.csv")
 nets <- sort(gsub("_int.csv", "", nets))
 params <- list(beta = 0.01, iter = 10000, model = "varying_preferences")
@@ -32,50 +30,41 @@ for (net in nets) {
 }
 
 # Control networks posteriors by sampling effort and standardize networks
-
 render("analysis/nets_standarization_Bayes.Rmd")
 
+#Visualize all networks
+render("analysis/net_plots.Rmd")
 
-#####
+##### ANALYSES #####
 
 # Asses sampling completeness
-
 render("analysis/sampling_completeness.Rmd")
 
 # Obtain network-level metrics for species-based and individual-based nets
-
 render("analysis/net_level_metrics.Rmd")
 
 # Null models for network-level metrics for species-based and individual-based nets
-
 render("analysis/net_level_null_models.Rmd")
 
 # Obtain web metrics for individual-based network posteriors
-
-render("analysis/net_metrics_posteriors.Rmd")
-
-# Selection of frugivore attributes for analysis
-
-render("analysis/prep_frug_attributes.Rmd")
-
-# Calculate frugivore contribution to overall interactions (Fig. 4)
-
-render("analysis/frugivore_contribution.Rmd")
+render("analysis/net_metrics_posteriors.Rmd") #needs good computer
 
 # Selection of network metrics
-
 render("analysis/selection_net_level.Rmd") # Explore net-level metrics
 render("analysis/selection_node_level.Rmd") # Explore node-level metrics
 
 # Compare individual-based and sp-based networks (Fig. 2)
-
 render("analysis/net_level_comparison.Rmd")
 
 # Calculate Individual specialization (Fig. 3)
+render("analysis/WIC_TNW_calc.Rmd") #need good computer
 
-render("analysis/WIC_TNW_calc.Rmd")
+# Selection of frugivore attributes for analysis
+render("analysis/prep_frug_attributes.Rmd")
 
-# Node-level analyses for individual-based networks (Fig. 5)
+# Calculate frugivore contribution to overall interactions (Fig. 4)
+render("analysis/frugivore_contribution.Rmd")
 
+# Node-level analyses for individual-based networks 
 render("analysis/PCA_cluster_analysis.Rmd")
-render("analysis/PCA_plant_individuals.Rmd")
+render("analysis/PCA_visualization.Rmd") #(Fig. 5)

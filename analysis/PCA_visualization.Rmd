@@ -1,0 +1,381 @@
+---
+title: "PCA visualization"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=F}
+library(here)
+library(tidyverse)
+library(tidylog)
+library(psych)
+library(ggfortify)
+library(patchwork)
+theme_set(theme_minimal())
+```
+
+Load metrics from posteriors data:
+
+```{r}
+files <- list.files(here("data/net_metrics_posteriors/"))
+
+#select only those files with node metrics (not net metrics)
+files_nodes <- files[grep("node", files)]
+
+df.metrics <- data.frame()
+
+for (i in 1:length(files_nodes)) {
+  
+  df <- readRDS(here(paste0("data/net_metrics_posteriors/", files_nodes[i]))) |> 
+    dplyr::select(-c(node,Fisher.alpha)) |> 
+    mutate(net_ind = paste0(net_id, "-", ind))
+  
+  df.metrics <- rbind(df.metrics, df)
+  
+}
+```
+
+Load networks information:
+
+```{r}
+info <- read.csv(here("data/net.level.selection.csv")) |> 
+  filter(type == "ind") |> 
+  select(net_id, net_n, net_code, code_ID, ref, 
+         family, plant_sp, bioregion, continent,
+         plot_rank1, plot_rank2, 
+         number.of.species.HL, number.of.species.LL)
+```
+
+Load net colors:
+
+```{r}
+net_cols <- read_csv(here("data/net_colors.csv"))
+
+col.bio <- as.character(net_cols$cols_bioregions2)
+names(col.bio) <- as.character(net_cols$plant_sp)
+
+col.bio.d <- as.character(net_cols$cols_bioregions_d2)
+names(col.bio.d) <- as.character(net_cols$bioregion)
+```
+
+Load cluster results:
+
+```{r}
+cluster.df <- readRDS(here("data/results_cluster_analysis.rds"))
+```
+
+
+Perform a single PCA with all posteriors:
+
+```{r}
+metrics.pca <- c("normalised.degree", 
+                 "species.strength",
+                 "species.specificity.index",
+                 "weighted.closeness",
+                 "mean.bray.overlap")
+
+full.pca.df <- df.metrics[, c("iter", metrics.pca)] |> 
+    dplyr::select(-iter)
+  
+full.pca <- prcomp(full.pca.df,
+              center = TRUE,
+              scale. = TRUE)
+  
+summary(full.pca)
+print(full.pca)
+```
+
+
+Summarize PCA - medians for point centroids of each individual and extract loadings
+
+```{r}
+most_common_group <- cluster.df |> 
+  group_by(net_id, net_ind) |> 
+  summarise(group_assigned_new = names(which.max(table(group_assigned_new))))
+
+pca.full.coords <- full.pca$x |> 
+    as.data.frame() |> 
+    cbind(df.metrics) |> 
+    left_join(info) |> 
+    left_join(most_common_group)
+
+pca.full.loadings <- full.pca$rotation |> 
+  as.data.frame() |> 
+  rownames_to_column("loading")
+
+pca.median <- pca.full.coords |> 
+  group_by(net_id, plant_sp, net_ind, group_assigned_new) |> 
+  summarise(PC1_median = median(PC1),
+            PC2_median = median(PC2))
+```
+
+```{r}
+net.cluster.summary <- cluster.df |> 
+  left_join(info) |> 
+  group_by(plant_sp, plot_rank2, net_id, net_n, iter, group_assigned_new) |> 
+  summarise(n = n()) |> 
+  group_by(net_n, iter) |> 
+  mutate(total_inds = sum(n),
+         per_inds = n/total_inds)
+```
+
+
+### Quantify in numbers:
+
+Percentage of different profile individuals
+
+```{r}
+net.cluster.summary  |> 
+  ungroup() |> 
+  select(net_id, iter, per_inds, cluster = group_assigned_new) |>
+  mutate(iter = as.character(iter))  |> 
+  tidyr::complete(net_id, iter) |> 
+  mutate(per_inds = if_else(is.na(per_inds), 0, per_inds)) |> 
+  group_by(cluster) |> 
+  summarise(mean_per = mean(per_inds),
+            ci_per = bayestestR::ci(per_inds, ci = 0.9))
+```
+
+Number of populations with each profile
+
+```{r}
+net.cluster.summary  |> 
+  ungroup() |> 
+  select(net_id, iter, per_inds, cluster = group_assigned_new) |>
+  mutate(iter = as.character(iter))  |> 
+  group_by(cluster, iter) |> 
+  summarise(n_pops = n_distinct(net_id)) |> 
+  group_by(cluster) |> 
+  summarise(mean_per = mean(n_pops),
+            ci_per = bayestestR::ci(n_pops, ci = 0.90))
+```
+
+Number of times (iters) that a population has at least 1 individual that falls in each category (max = 1000 iters)
+
+```{r}
+net.cluster.summary |> 
+  group_by(net_id, group_assigned_new) |> 
+  summarise(n = n()) |> 
+  pivot_wider(names_from = group_assigned_new, values_from = n)
+```
+
+Number of individuals that mostly fall in each category per population
+
+```{r}
+most_common_group |> 
+  group_by(net_id) |> 
+  count(group_assigned_new) |> 
+  pivot_wider(names_from = group_assigned_new, values_from = n)
+```
+
+Percentage of "keystone" individuals per population
+
+```{r}
+net.cluster.summary |> 
+  ungroup() |> 
+  filter(group_assigned_new == "Keystone") |>
+  select(net_id, iter, per_inds) |>
+  mutate(iter = as.character(iter))  |> 
+  tidyr::complete(net_id, iter) |> 
+  mutate(per_inds = if_else(is.na(per_inds), 0, per_inds)) |> 
+  group_by(net_id) |> 
+  summarise(mean_per = mean(per_inds),
+            ci_per = bayestestR::ci(per_inds, ci = 0.90))
+```
+
+
+## PLOTS
+
+
+```{r}
+cluster.cols = c("#1D6996", "#F6CF71", "#B2B2B2", "#73AF48")
+
+p.pca.clusters <- ggplot(pca.median, 
+             aes(x = PC1_median, y = PC2_median, 
+             color = group_assigned_new)) + 
+  geom_segment(data = pca.full.loadings, inherit.aes = FALSE,
+               aes(x = 0, y = 0, xend = 5*PC1, yend = 5*PC2), 
+               arrow = arrow(length = unit(0.1, "inches")),
+               color = "grey30")+ 
+  geom_point(size = 2) + 
+  #rcartocolor::scale_color_carto_d(palette = "Pastel") +
+  scale_color_manual(values = cluster.cols) + 
+  ggrepel::geom_text_repel(data = pca.full.loadings, inherit.aes = FALSE,
+               aes(x = 5*PC1, y = 5*PC2, label = loading)) +
+  theme(legend.position = "none",
+        panel.border = element_rect(color = "grey50", fill = NA))  +
+  labs(x = "PC1 (51%)", y = "PC2 (25%)")
+
+p.clusters <- ggplot(net.cluster.summary,
+             aes(x = fct_reorder(as.character(net_n), plot_rank2), 
+                 y = per_inds, 
+             color = group_assigned_new)) + 
+  ggdist::stat_pointinterval(fill = "white", .width = c(0.85), linewidth = 0.75) + 
+  theme(axis.text.x = element_blank(),
+        legend.position = "none",
+        panel.grid.major.x = element_blank(),
+        panel.border = element_rect(color = "grey50", fill = NA)) + 
+  facet_wrap(~group_assigned_new, nrow = 1) + 
+  scale_x_discrete(expand = c(.05, .05)) +
+  scale_y_continuous(expand = c(.02, .02)) +
+  #rcartocolor::scale_color_carto_d(palette = "Pastel") +
+  scale_color_manual(values = cluster.cols) + 
+  labs(x = "Populations", 
+       y = "Percentage of individuals \nbelonging to the cluster")
+
+p.pca.clusters/p.clusters + plot_layout(heights = c(6,2))
+```
+
+
+```{r}
+library(ggh4x)
+
+p.clusters.bars <- cluster.df |> 
+  left_join(info) |> 
+  group_by(net_id) |> 
+  mutate(net_n = cur_group_id()) |> 
+  group_by(bioregion, net_n, iter, group_assigned_new) |> 
+  summarise(n = n()) |> 
+  group_by(iter, net_n) |> 
+  mutate(total_inds = sum(n),
+         per_inds = n/total_inds) |> 
+  ggplot(aes(x = iter, y = per_inds, fill = group_assigned_new)) + 
+  geom_bar(stat = "identity") + 
+  facet_nested(~bioregion + net_n) + 
+  #rcartocolor::scale_fill_carto_d(palette = "Pastel") + 
+  scale_fill_manual(values = cluster.cols) +
+  theme(axis.text.x = element_blank(),
+        legend.position = "top",
+        panel.grid = element_blank(),
+        panel.spacing = unit(.2, "lines")) + 
+  labs(x = "Plant population", 
+       y = "Cumulative proportion of individuals \nbelonging to each interaction profile",
+       fill = "Interaction profile")
+
+p.pca.clusters/ p.clusters.bars + plot_layout(heights = c(6,2))
+
+ggsave(here("figs/Fig_5_PCA_clusters.pdf"), width = 10, height = 10)
+```
+
+
+```{r}
+p.pca.bioregions <- ggplot(pca.median, 
+             aes(x = PC1_median, y = PC2_median, 
+             color = plant_sp)) + 
+  geom_segment(data = pca.full.loadings, inherit.aes = FALSE,
+               aes(x = 0, y = 0, xend = 5*PC1, yend = 5*PC2), 
+               arrow = arrow(length = unit(0.1, "inches")),
+               color = "grey30")+ 
+  geom_point(size = 2) + 
+  scale_color_manual(values = col.bio) +
+  ggrepel::geom_text_repel(data = pca.full.loadings, inherit.aes = FALSE,
+               aes(x = 5*PC1, y = 5*PC2, label = loading)) +
+  theme(legend.position = "none",
+        panel.border = element_rect(color = "grey50", fill = NA)) +
+  labs(x = "PC1 (51%)", y = "PC2 (25%)")
+
+p.pca.bio.clust <- ggplot(pca.median, aes(x = PC1_median, y = PC2_median, 
+             color = plant_sp, shape = group_assigned_new,
+             fill = plant_sp)) + 
+  geom_segment(data = pca.full.loadings, inherit.aes = FALSE,
+               aes(x = 0, y = 0, xend = 5*PC1, yend = 5*PC2), 
+               arrow = arrow(length = unit(0.1, "inches")),
+               color = "grey30")+ 
+  geom_point(size = 2) + 
+  #scale_shape_manual(values = c(17, 4, 16, 21)) +
+  scale_shape_manual(values = c(21, 4, 24, 25)) +
+  scale_color_manual(values = col.bio) +
+  scale_fill_manual(values = col.bio) +
+  ggrepel::geom_text_repel(data = pca.full.loadings, inherit.aes = FALSE,
+               aes(x = 5*PC1, y = 5*PC2, label = loading)) +
+  theme(legend.position = "none",
+        panel.border = element_rect(color = "grey50", fill = NA)) +
+  labs(x = "PC1 (51%)", y = "PC2 (25%)")
+
+p.clusters.bio <- ggplot(net.cluster.summary,
+             aes(x = fct_reorder(as.character(net_n), plot_rank2), 
+                 y = per_inds, fill = plant_sp,
+                 color = plant_sp, shape = group_assigned_new)) + 
+  ggdist::stat_pointinterval(.width = c(0.85), linewidth = 0.75) + 
+  #scale_shape_manual(values = c(17, 4, 16, 21)) +
+  scale_shape_manual(values = c(21, 4, 24, 25)) +
+  scale_color_manual(values = col.bio) + 
+  scale_fill_manual(values = col.bio) + 
+  theme(axis.text.x = element_blank(),
+        legend.position = "none",
+        panel.grid.major.x = element_blank(),
+        panel.border = element_rect(color = "grey50", fill = NA) ) + 
+  facet_wrap(~group_assigned_new, nrow = 1) + 
+  scale_x_discrete(expand = c(.05, .05)) +
+  scale_y_continuous(expand = c(.02, .02)) +
+  labs(x = "Populations", 
+       y = "Percentage of individuals \nbelonging to the cluster")
+
+p.pca.bio.clust / p.clusters.bio + plot_layout(heights = c(6,2))
+
+ggsave(here("figs/Fig_S7_PCA_clusters_bioregion.pdf"), width = 9, height = 9)
+```
+
+
+PCA with full posterior distribution per plant:
+
+```{r}
+library(paletteer)
+library(scales)
+
+inds_per_plant_sp <- pca.full.coords |> 
+  group_by(plant_sp, plot_rank2) |> 
+  summarise(inds = n_distinct(net_ind)) |>
+  arrange(plot_rank2)
+
+inds <- pca.full.coords |> 
+  distinct(plant_sp, plot_rank2, net_ind) |> 
+  arrange(plot_rank2) 
+
+rainbow <- paletteer_d("rcartocolor::Prism")
+rb <- colorRampPalette(rainbow)
+# 
+# cols_inds = c(#Mediterranean studies
+#               rb(63), rb(24), rb(26), rb(105), rb(18), rb(19), rb(19), rb(80), rb(19),
+#               #Southern temperate studies
+#               rb(77), rb(172), rb(26), 
+#               #Tropical studies
+#               rb(15), rb(10), rb(27), rb(12), rb(62), rb(13), rb(10), rb(18), rb(24), 
+#               rb(24), rb(15), rb(25), rb(22), rb(32), rb(31), rb(14), rb(35))
+
+cols_inds <- character()
+
+for(i in 1:length(inds_per_plant_sp$plant_sp)) {
+  
+  n_inds <- inds_per_plant_sp[i, ]$inds
+  
+  cols_inds <- c(cols_inds, rb(n_inds))
+}
+
+names(cols_inds) <- inds$net_ind
+
+#scales::show_col(cols_inds)
+
+pca.full.coords |> 
+  ggplot(aes(x = PC1, y = PC2, group = net_ind, color = net_ind)) + 
+  geom_point(alpha = 0.01) +
+  scale_color_manual(values = cols_inds) +
+  theme(legend.position = "none",
+        panel.border = element_rect(color = "gray30", fill = NA)) +
+  geom_segment(data = pca.full.loadings, inherit.aes = FALSE,
+               aes(x = 0, y = 0, xend = 5*PC1, yend = 5*PC2), 
+               arrow = arrow(length = unit(0.05, "inches")), color = "gray30") +
+  facet_wrap(~fct_reorder(plant_sp, plot_rank2), ncol = 5)
+
+ggsave(here("figs/Fig_S6_PCA_posteriors_plants.png"), height = 10, width = 8)
+```
+
+
+
+
+

@@ -17,7 +17,6 @@ library(tidyverse)
 library(magrittr)
 library(reshape2)
 library(patchwork)
-library(ggalt)
 library(iNEXT)
 
 theme_set(theme_minimal())

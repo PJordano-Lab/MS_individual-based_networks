@@ -18,12 +18,10 @@ library(tidyverse)
 library(magrittr)
 library(rcartocolor)
 library(patchwork)
-library(ggalt)
 library(psych)
 library(ggfortify)
 library(ggrepel)
 library(knitr)
-library(kableExtra)
 library(cluster)
 library(GGally)
 library(reshape2)
@@ -65,7 +63,7 @@ hc1 <- hclust(d, method = "complete")
 # Plot the obtained dendrogram
 plot(hc1, cex = 0.6, hang = -1)
 #rect.hclust(hc1, k = 10)
-# save as PDF here("analysis/_exploratory_analysis/_exploratory_figs/cluster_metrics.pdf"), width = 7, height = 5)
+# saved as PNG in "analysis/figs/Fig_S1_cluster_net_metrics.pdf", width = 600, height = 500
 ```
 
 Compare the three niche overlap metrics:
@@ -79,18 +77,31 @@ net.level %>%
   scale_fill_carto_d()
 ```
 
+Rename metrics:
+
+```{r}
+net.level <- net.level |> 
+  rename("Modularity" = "M") |> 
+  rename("Assortativity" = "assortativity") |> 
+  rename("Centralization" = "centralization.w") |> 
+  rename("Connectance" = "connectance") |> 
+  rename("Interaction_evenness" = "interaction.evenness") |> 
+  rename("Weighted_NODF" = "weighted.NODF") |> 
+  rename("Network_size" = "net_size")
+```
+
 
 Correlation between metrics:
 
 ```{r}
 glimpse(net.level)
-metrics.of.interest.size <- c("connectance", 
-                         "weighted.NODF", 
-                         "M", 
-                         "interaction.evenness",
-                         "centralization.w",
-                         "assortativity",
-                         "net_size")
+metrics.of.interest.size <- c("Connectance", 
+                         "Weighted_NODF", 
+                         "Modularity", 
+                         "Interaction_evenness",
+                         "Centralization",
+                         "Assortativity",
+                         "Network_size")
 
 #Remove net_size
 metrics.of.interest <- metrics.of.interest.size[metrics.of.interest.size != "net_size"]
@@ -104,7 +115,7 @@ p.mat <- cor_pmat(net.level[, metrics.of.interest.size], conf.level = 0.95)
 
 ggcorrplot(corr_matrix, type = "lower",  lab = T) 
 
-ggsave(here("figs/cor_net_metrics_new.pdf"), width = 7, height=7)
+#ggsave(here("figs/Fig_S2_cor_net_metrics.png"), width = 7, height=7)
 ```
 
 
@@ -136,7 +147,7 @@ summary(net.level[, c("type", metrics.of.interest)])
 
 net.level[, c("type", metrics.of.interest)] %>%
   #group_by(type) %>% 
-  summarise_at(vars(connectance:assortativity), sd)
+  summarise_at(vars(Connectance:Assortativity), sd)
 
 
 ind <- net.level[, c("type", metrics.of.interest)] %>% filter(type == "ind")
@@ -146,17 +157,17 @@ summary(sp)
 
 net.level[, c("type", metrics.of.interest)] %>%
   group_by(type) %>% 
-  summarise_at(vars(connectance:assortativity), sd)
+  summarise_at(vars(Connectance:Assortativity), sd)
 
 
 #coefficient of variation
 net.level[, c("type", metrics.of.interest)] %>%
   #group_by(type) %>% 
-  summarise(cv_con = sd(connectance) / mean(connectance) * 100,
-            cv_nodf = sd(weighted.NODF) / mean(weighted.NODF) * 100,
-            cv_mod = sd(M) / mean(M) * 100,
-            cv_cen = sd(centralization.w) / mean(centralization.w) * 100,
-            cv_ass = sd(assortativity) / mean(assortativity) * 100)
+  summarise(cv_con = sd(Connectance) / mean(Connectance) * 100,
+            cv_nodf = sd(`Weighted_NODF`) / mean(`Weighted_NODF`) * 100,
+            cv_mod = sd(Modularity) / mean(Modularity) * 100,
+            cv_cen = sd(Centralization) / mean(Centralization) * 100,
+            cv_ass = sd(Assortativity) / mean(Assortativity) * 100)
 ```
 
 

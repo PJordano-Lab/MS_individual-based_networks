@@ -145,7 +145,7 @@ p2 <- null.data.sum |>
 
 p1 / p2 + plot_layout(guides = "collect")
 
-#ggsave(here("figs/figs_rev1/Fig_2_panels.pdf"), width = 9, height = 7)
+ggsave(here("figs/Fig_2_net_level_comparison.pdf"), width = 10, height = 5)
 
 ```
 

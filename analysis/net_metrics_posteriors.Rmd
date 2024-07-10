@@ -2,7 +2,7 @@
 title: "Estimation of network metrics for Bayesian networks"
 author: "Elena Quintero"
 date: "`r Sys.Date()`"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -119,12 +119,6 @@ for (i in 1:length(nets)) {
 }
 ```
 
-```{r}
-# a <- metrics.list[[15]]
-# 
-# glimpse(a)
-```
-
 Save net-level metrics:
 
 ```{r}
@@ -237,12 +231,6 @@ for (i in 1:length(nets)) {
 ```
 
 By using Newman's method to calculate the one-mode projection of the net, this methods creates a one-mode projection in which the strength of a node is equal to the number of ties originating from that node in the two-mode network (e.g. the sum of weights attached to ties originating from node A in the one-mode projection is 2, and node A is connected to two red nodes). Newman bases the weights on Newman's (2001) method of discounting for the size of collaborations.
-
-```{r}
-# a <- node.metrics.list[[15]]
-# 
-# glimpse(a)
-```
 
 Save node-level metrics:
 

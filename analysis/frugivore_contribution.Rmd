@@ -108,7 +108,7 @@ frug.accum.ints %>%
        y = "Contribution to total interactions")
   #caption = "Black contour represent frugivore species that aggregated perform >50% of interactions"
 
-ggsave(here("figs/frugivore_ints_accumulated.pdf"), width = 8, height = 9)
+ggsave(here("figs/Fig_S4_frugivore_ints_accumulated.pdf"), width = 8, height = 9)
 ```
 
 
@@ -127,7 +127,7 @@ frug.accum.ints %>%
        x = "Frugivore's contribution to the overall interactions in the network", 
        color = "Region", size = "Body mass \nz-score") 
 
-ggsave(here("figs/interaction_distribution_frugs.pdf"), height = 5, width = 7)
+ggsave(here("figs/Fig_4_interaction_distribution_frugs.pdf"), height = 5, width = 7)
 ```
 
 
@@ -149,16 +149,3 @@ cor.test(data.model$ints, data.model$per.plants, method = "spearman")
 cor.test(data.model$ints, data.model$bmass.scaled, method = "spearman")
 cor.test(data.model$per.plants, data.model$bmass.scaled, method = "spearman")
 ```
-
-
-```{r}
-library(glmmTMB)
-library(DHARMa)
-
-m1 <- glmmTMB::glmmTMB(ints ~ per.plants +  (1|net_id), data.model, family = "nbinom2")
-m1 <- glmmTMB::glmmTMB(log(ints) ~ log(per.plants) + bmass.scaled + (1|net_id), data.model)
-
-summary(m1)
-DHARMa::simulateResiduals(m1, plot = TRUE)
-```
-

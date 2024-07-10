@@ -225,11 +225,11 @@ ggplot(frugs, aes(x = bmass)) +
 
 ```{r}
 #Net colors:
-mycols <- as.character(net_info$cols_continent1)
+mycols <- as.character(net_info$cols_bioregions2)
 names(mycols) <- as.character(net_info$plant_sp)
 
-mycols.cont <- as.character(net_info$cols_continent_d1)
-names(mycols.cont) <- as.character(net_info$continent)
+mycols.bio <- as.character(net_info$cols_bioregions_d2)
+names(mycols.bio) <- as.character(net_info$bioregion)
 ```
 
 ```{r}
@@ -237,20 +237,20 @@ frug.cons.full %>%
   filter(!net_id %in% c("08_01", "12_01", "12_06", "12_07")) %>%
   ungroup() %>% group_by(net_id) %>% 
   mutate(bmass.scale = scale(bmass)) %>%
-  ggplot(aes(y = ints, color = continent, x = bmass.scale)) + 
+  ggplot(aes(y = ints, color = bioregion, x = bmass.scale)) + 
   scale_y_continuous(limits = c(0,1)) +
   geom_point(alpha = 0.6) +
-  scale_color_manual(values = mycols.cont) + 
+  scale_color_manual(values = mycols.bio) + 
   facet_wrap(~class, scales = "free")
 
 frug.cons.full %>%
   filter(!net_id %in% c("08_01", "12_01", "12_06", "12_07")) %>%
   ungroup() %>% group_by(net_id) %>% 
   mutate(bmass.scale = scale(bmass)) %>%
-  ggplot(aes(y = ints, color = continent, x = bmass.scale)) + 
+  ggplot(aes(y = ints, color = bioregion, x = bmass.scale)) + 
   scale_y_continuous(limits = c(0,1)) +
   geom_point(alpha = 0.6) +
-  scale_color_manual(values = mycols.cont) + geom_smooth()
+  scale_color_manual(values = mycols.bio) + geom_smooth()
 ```
 
 

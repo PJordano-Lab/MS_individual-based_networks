@@ -8,21 +8,6 @@ output: github_document
 ```{r setup, include = F}
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
-
-knitr::knit_hooks$set(timeit = local({
-  now = NULL
-  function(before, options) {
-    if (before) {
-      now <<- Sys.time()
-    } else {
-      # calculate the time difference after a chunk
-      res <- difftime(Sys.time(), now, units = "mins")
-      # return a character string to show the time
-      paste("Time for this code chunk to run:", round(res,
-        2), "minutes")
-    }
-  }})
-)
 ```
 
 ```{r, message=F}
@@ -31,7 +16,6 @@ library(tidyverse)
 library(tidylog)
 library(psych)
 library(ggfortify)
-library(ggnewscale)
 library(patchwork)
 theme_set(theme_minimal())
 ```
@@ -127,7 +111,7 @@ for (i in 1:1000) {
 
 Plot example PCAs
 
-```{r, include=FALSE, eval=FALSE}
+```{r}
 
 for (i in 1) {
   
@@ -166,27 +150,18 @@ for (i in 1) {
 
 ## Compute clusters
 
-```{r eval=FALSE}
+```{r}
 library(adegenet)
 
-max_iter = 1000
+iters <- split(df.metrics, df.metrics$iter)
 
-n_clusters = 4
+#iter <- iters[[1]]
 
-cluster.df <- data.frame()
+calc.cluster <- function (iter) {
 
-for (i in 1:max_iter) {
-  
-  for (c in n_clusters){
+    pca.data <- iter[, metrics.pca]
     
-    data <- df.metrics |> 
-      filter(iter == i)
-    
-    pca.data <- df.metrics[, c("iter", metrics.pca)] |> 
-      filter(iter == i) |> 
-      dplyr::select(-iter)
-    
-    grp <- find.clusters(pca.data, n.pca = 3, n.clust = c) 
+    grp <- find.clusters(pca.data, n.pca = 3, n.clust = 4) 
     
     dapc <- dapc(pca.data, grp$grp, n.pca = 3, n.da = 2)
     
@@ -194,30 +169,36 @@ for (i in 1:max_iter) {
     
     assig.prob <- data.frame(dapc$posterior)
     
-    pca_id <- pca.list[[i]]
+    pca_id <- prcomp(pca.data,
+              center = TRUE,
+              scale. = TRUE)
     
     pca_values <- pca_id[["x"]] |> 
       as.data.frame() |> 
-      cbind(net_ind = data$net_ind) |> 
+      cbind(net_ind = iter$net_ind) |> 
       cbind(group) |> 
       cbind(assig.prob) |> 
       relocate(net_ind, .before = everything()) |> 
-      left_join(data, by = "net_ind") |> 
-      mutate(iter = i,
-             clusters = c)
-    
-    cluster.df <- rbind(cluster.df, pca_values)
-
-  }
+      left_join(iter, by = "net_ind")
   
 }
+```
 
+```{r}
+mytime <- Sys.time()
+
+cluster.list <- lapply(iters, calc.cluster)
+
+Sys.time() - mytime
+
+cluster.df <- bind_rows(cluster.list)
 ```
 
 
 Re-categorize the name of the clusters based on some plants that don't usually change position:
 
-```{r, eval = FALSE}
+```{r}
+#dataframe to help selecting "reference individuals" to name clusters.
 inds_to_select <- cluster.df |> 
   group_by(net_id, net_ind) |> 
   summarise(n = n(),
@@ -225,40 +206,45 @@ inds_to_select <- cluster.df |>
             spez = mean(species.specificity.index),
             overlap = mean(mean.bray.overlap)) |> 
   filter(n == 1000)
+```
 
+```{r}
+#iter <- cluster.list[[1]]
 
-recat.cluster.df <- data.frame()
-
-for (i in 1:max_iter) {
+recat.cluster.fun <- function (iter) {
   
-  cluster.df.iter <- cluster.df |> 
-    filter(iter == i) 
-    #filter(clusters == 4)
-
-    key <- cluster.df.iter |> 
+  key <- iter |> 
       filter(net_ind == "05_01-1823")
-    
-    spez <- cluster.df.iter |> 
+  
+  spez <- iter |> 
       filter(net_ind == "03_05-61")
     
-    overlap <- cluster.df.iter |> 
+  overlap <- iter |> 
       filter(net_ind == "12_10-ZIZO15")
 
-  tmp <- cluster.df.iter |> 
+  tmp <- iter |> 
     mutate(group_assigned_new = case_when(group_assigned == 
-                                            as.numeric(key$group_assigned) ~ "Leading", 
+                                            as.numeric(key$group_assigned) ~ "Keystone", 
                                           group_assigned == 
                                             as.numeric(spez$group_assigned) ~ "Specialists",
                                           group_assigned == 
                                             as.numeric(overlap$group_assigned) ~ "Overlapping"
-                                          ))
-  
-  recat.cluster.df <- rbind(recat.cluster.df, tmp)
+                                          )) |> 
+    mutate(group_assigned_new = ifelse(is.na(group_assigned_new), "Neutral", group_assigned_new))
 
 }
+```
 
-recat.cluster.df <- recat.cluster.df |> 
-  mutate(group_assigned_new = ifelse(is.na(group_assigned_new), "Neutral", group_assigned_new))
+```{r}
+mytime <- Sys.time()
 
+recat.cluster.list <- lapply(cluster.list, recat.cluster.fun)
+
+Sys.time() - mytime
+
+recat.cluster.df <- bind_rows(recat.cluster.list)
+```
+
+```{r}
 saveRDS(recat.cluster.df, here("data/results_cluster_analysis.rds"))
 ```
