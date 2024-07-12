@@ -67,4 +67,4 @@ render("analysis/frugivore_contribution.Rmd")
 
 # Node-level analyses for individual-based networks 
 render("analysis/PCA_cluster_analysis.Rmd")
-render("analysis/PCA_visualization.Rmd") #(Fig. 5)
+render("analysis/PCA_overview.Rmd") #(Fig. 5)
