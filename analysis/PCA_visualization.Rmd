@@ -1,5 +1,5 @@
 ---
-title: "PCA visualization"
+title: "PCA quantification and visualization"
 author: "Elena Quintero"
 date: "`r Sys.Date()`"
 output: github_document
@@ -134,7 +134,7 @@ net.cluster.summary  |>
   ungroup() |> 
   select(net_id, iter, per_inds, cluster = group_assigned_new) |>
   mutate(iter = as.character(iter))  |> 
-  tidyr::complete(net_id, iter) |> 
+  tidyr::complete(net_id, iter, cluster) |> 
   mutate(per_inds = if_else(is.na(per_inds), 0, per_inds)) |> 
   group_by(cluster) |> 
   summarise(mean_per = mean(per_inds),
@@ -161,7 +161,8 @@ Number of times (iters) that a population has at least 1 individual that falls i
 net.cluster.summary |> 
   group_by(net_id, group_assigned_new) |> 
   summarise(n = n()) |> 
-  pivot_wider(names_from = group_assigned_new, values_from = n)
+  pivot_wider(names_from = group_assigned_new, values_from = n) |> 
+  print(n = "inf")
 ```
 
 Number of individuals that mostly fall in each category per population
@@ -170,7 +171,8 @@ Number of individuals that mostly fall in each category per population
 most_common_group |> 
   group_by(net_id) |> 
   count(group_assigned_new) |> 
-  pivot_wider(names_from = group_assigned_new, values_from = n)
+  pivot_wider(names_from = group_assigned_new, values_from = n) |> 
+  print(n = "inf")
 ```
 
 Percentage of "keystone" individuals per population
