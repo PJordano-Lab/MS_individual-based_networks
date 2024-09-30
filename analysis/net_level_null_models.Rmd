@@ -150,35 +150,12 @@ for (i in 1:length(nets_multiplied)) {
 ```
 
 Check Vazquez null models sum up to 1:
+
 ```{r}
 sum(vaznull.list[[1]][[1]])
 sum(vaznull.list[[81]][[981]])
 ```
 
-Compare null models for same net using different scale factors (e.g. 1000, 10000 and 100000):
-```{r, eval=FALSE, include=FALSE}
-nulls1 <- nullmodel(nets[[7]]*1000, N = 10, method = "vaznull")
-nulls2 <- nullmodel(nets[[7]]*10000, N = 10, method = "vaznull")
-nulls3 <- nullmodel(nets[[7]]*100000, N = 10, method = "vaznull")
-
-sum(nets[[7]])
-sum(nulls1[[1]]/1000)
-sum(nulls1[[3]]/1000)
-sum(nulls2[[1]]/10000)
-sum(nulls2[[3]]/10000)
-sum(nulls3[[5]]/100000)
-sum(nulls3[[9]]/100000)
-
-networklevel(nets[[7]], index = "connectance")
-networklevel(nulls1[[1]]/1000, index = "connectance")
-networklevel(nulls2[[1]]/10000, index = "connectance")
-networklevel(nulls3[[1]]/100000, index = "connectance")
-
-networklevel(nets[[7]], index = "weigthed.NODF")
-networklevel(nulls1[[1]]/1000, index = "weigthed.NODF")
-networklevel(nulls2[[1]]/10000, index = "weigthed.NODF")
-networklevel(nulls3[[1]]/100000, index = "weigthed.NODF")
-```
 
 ## Calculate network level metrics:
 
@@ -267,10 +244,9 @@ web.metrics <- lapply(1:length(vaznull.list), function(i) {
   
   return(metrics)
 })
-
-# Close progress bar
-close(pb)
 ```
+
+#ELENA UNTIL HEREEEEE!!!!! 
 
 Makes one data.table from a list of many
 
@@ -293,42 +269,85 @@ glimpse(web.metrics.df)
 ```
 
 
+```{r}
+saveRDS(web.metrics.df, here("data/net_level_nulls_vazquez.rds"))
+```
+
+
 Run umbrella function for each *Patefield* null model network:
 
 ```{r}
-web.metrics.pat <- lapply(1:length(null.list), function(i) {
-  metrics <- process_network(i, null.list)
-  
-  # Update progress bar
-  setTxtProgressBar(pb, i)
-  
-  return(metrics)
-})
-
-web.metrics.pat.df <- data.table::rbindlist(
-  lapply(1:length(web.metrics.pat), function(i) {
-  data.table::rbindlist(web.metrics.pat[[i]])
-  })
-  )
-
-web.metrics.pat.df <- web.metrics.pat.df |> 
-  relocate(type, .before = everything()) |> 
-  relocate(net_id, .after = type) |> 
-  relocate(iter, .after = net_id) |> 
-  mutate(net_code = paste0(type, "_", net_id)) |> 
-  group_by(iter) |> 
-  mutate(net_n = order(net_code))
-
-glimpse(web.metrics.pat.df)
+# web.metrics.pat <- lapply(1:length(null.list), function(i) {
+#   metrics <- process_network(i, null.list)
+#   
+#   # Update progress bar
+#   setTxtProgressBar(pb, i)
+#   
+#   return(metrics)
+# })
+# 
+# web.metrics.pat.df <- data.table::rbindlist(
+#   lapply(1:length(web.metrics.pat), function(i) {
+#   data.table::rbindlist(web.metrics.pat[[i]])
+#   })
+#   )
+# 
+# web.metrics.pat.df <- web.metrics.pat.df |> 
+#   relocate(type, .before = everything()) |> 
+#   relocate(net_id, .after = type) |> 
+#   relocate(iter, .after = net_id) |> 
+#   mutate(net_code = paste0(type, "_", net_id)) |> 
+#   group_by(iter) |> 
+#   mutate(net_n = order(net_code))
+# 
+# glimpse(web.metrics.pat.df)
 ```
 
 
 ```{r}
-saveRDS(web.metrics.df, here("data/net_level_nulls_vazquez.rds"))
-
 saveRDS(web.metrics.pat.df, here("data/net_level_nulls.rds"))
 ```
 
+
+Compare null models for same net using different scale factors (e.g. 1000, 10000 and 100000):
+
+```{r, eval=FALSE, include=FALSE}
+nulls1 <- nullmodel(nets[[7]]*1000, N = 10, method = "vaznull")
+nulls2 <- nullmodel(nets[[7]]*10000, N = 10, method = "vaznull")
+nulls3 <- nullmodel(nets[[7]]*100000, N = 10, method = "vaznull")
+
+sum(nets[[7]])
+sum(nulls1[[1]]/1000)
+sum(nulls1[[3]]/1000)
+sum(nulls2[[1]]/10000)
+sum(nulls2[[3]]/10000)
+sum(nulls3[[5]]/100000)
+sum(nulls3[[9]]/100000)
+
+networklevel(nets[[7]], index = "connectance")
+networklevel(nulls1[[1]]/1000, index = "connectance")
+networklevel(nulls2[[1]]/10000, index = "connectance")
+networklevel(nulls3[[1]]/100000, index = "connectance")
+
+networklevel(nets[[7]], index = "weighted NODF")
+
+wNODF = function(net, factor){
+  a = networklevel(net/factor, index = "weighted NODF")
+  return(as.numeric(a))
+  }
+
+a = lapply(nulls1, wNODF, factor = 1000)
+b = lapply(nulls2, wNODF, factor = 10000)
+c = lapply(nulls3, wNODF, factor = 100000)
+
+reshape2::melt(a) %>% summarise(mean(value))
+reshape2::melt(b) %>% summarise(mean(value))
+reshape2::melt(c) %>% summarise(mean(value))
+
+d = lapply(nulls1, compute_bipartite_metrics) 
+d = reshape2::melt(d)
+
+```
 
 ```{r eval = FALSE}
 pb = txtProgressBar(min = 0, max = length(nets), style = 3) 
