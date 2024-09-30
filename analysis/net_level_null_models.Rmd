@@ -26,9 +26,9 @@ library(tnet)
 
 Read matrices:
 
-I use ceiling function to round the minimum interaction to 1. 
+First I create a function to calculate for each matrix, the scale factor necessary so that every non-zero value has at least number different that zero before the decimals. Then I do a ceiling (function to round interaction to integers). By using a scale factor decimals are not lost.
 
-```{r eval = FALSE}
+```{r}
 #Read list of names
 
 net_names <- list.files(path = here("networks/nets_std"), pattern = "_int")
@@ -56,8 +56,6 @@ for (i in 1:length(net_names)){
     
   }
   
-  net <- ceiling(net)
-  
   nets[[i]] <- net #add to list
   names(nets)[i] <- net_names[[i]] #name the list
   
@@ -65,29 +63,126 @@ for (i in 1:length(net_names)){
 
 ```
 
+First I create a function to calculate for each matrix, the scale factor necessary so that every non-zero value has at least number different that zero before the decimals. Then I do a ceiling (function to round interaction to integers). By using a scale factor small decimals are not lost.
 
-Generate 1000 random nets following Patefield's algorithm (keeps constant marginal rows and columns)
+```{r}
+calc_order_magnitude <- function(matrix) {
+  # Excluir ceros para evitar división por cero
+  non_zero_values <- matrix[matrix != 0]
+  
+  # Obtener el valor mínimo absoluto de los valores no cero
+  min_value <- min(abs(non_zero_values))
+  
+  # Calcular el orden de magnitud necesario para convertirlo en un número mayor o igual a 1
+  order_magnitude <- 10^ceiling(-log10(min_value))
+  
+  return(order_magnitude)
+}
 
-```{r eval = FALSE}
-null.list <- list()
+# Calcular el factor de escala para todas las redes
+scale_factors <- lapply(nets, calc_order_magnitude)
 
-for (i in 1:length(nets)) {
+```
+
+```{r}
+nets_multiplied <- list()
+
+for (i in 1:length(nets)){
   
-  print(i)
+  nets_multiplied[[i]] <- ceiling(nets[[i]] * scale_factors[[i]])
   
-  nulls <- nullmodel(nets[[i]], N = 1000, method = "r2dtable")
-  
-  null.list <- append(null.list, list(nulls))
-  
-  names(null.list)[[i]] <- names(nets)[i]
-  
+  names(nets_multiplied)[i] <- net_names[[i]] #name the list
+
 }
 ```
 
 
-Network level metrics:
+Generate 1000 random nets following *Patefield*'s algorithm (keeps constant marginal rows and columns)
 
-```{r eval=FALSE}
+```{r}
+null.list <- list()
+#null.list <- vector("list", 5)
+
+for (i in 1:length(nets_multiplied)) {
+  
+  print(i)
+  
+  nulls <- nullmodel(nets_multiplied[[i]], N = 1000, method = "r2dtable") 
+  
+  scale_back <- function(list){
+    list / scale_factors[[i]]
+    }
+  
+  nulls.fix <- lapply(nulls, scale_back)
+  
+  null.list <- append(null.list, list(nulls.fix))
+  #null.list[[i]] <- nulls.fix
+  
+  names(null.list)[[i]] <- names(nets_multiplied)[i]
+  
+}
+```
+
+Generate 1000 random nets following *Vazquez* algorithm (keeps constant marginal rows and columns)
+
+```{r}
+#vaznull.list <- list()
+vaznull.list <- vector("list", 5)
+
+for (i in 1:length(nets_multiplied)) {
+  
+  print(i)
+  
+  nulls <- nullmodel(nets_multiplied[[i]], N = 1000, method = "vaznull")
+  
+  scale_back <- function(list){
+    list / scale_factors[[i]]
+    }
+  
+  nulls.fix <- lapply(nulls, scale_back)
+  
+  #vaznull.list <- append(vaznull.list, list(nulls.fix))
+  vaznull.list[[i]] <- nulls.fix
+  
+  names(vaznull.list)[[i]] <- names(nets_multiplied)[i]
+  
+}
+```
+
+Check Vazquez null models sum up to 1:
+```{r}
+sum(vaznull.list[[1]][[1]])
+sum(vaznull.list[[81]][[981]])
+```
+
+Compare null models for same net using different scale factors (e.g. 1000, 10000 and 100000):
+```{r, eval=FALSE, include=FALSE}
+nulls1 <- nullmodel(nets[[7]]*1000, N = 10, method = "vaznull")
+nulls2 <- nullmodel(nets[[7]]*10000, N = 10, method = "vaznull")
+nulls3 <- nullmodel(nets[[7]]*100000, N = 10, method = "vaznull")
+
+sum(nets[[7]])
+sum(nulls1[[1]]/1000)
+sum(nulls1[[3]]/1000)
+sum(nulls2[[1]]/10000)
+sum(nulls2[[3]]/10000)
+sum(nulls3[[5]]/100000)
+sum(nulls3[[9]]/100000)
+
+networklevel(nets[[7]], index = "connectance")
+networklevel(nulls1[[1]]/1000, index = "connectance")
+networklevel(nulls2[[1]]/10000, index = "connectance")
+networklevel(nulls3[[1]]/100000, index = "connectance")
+
+networklevel(nets[[7]], index = "weigthed.NODF")
+networklevel(nulls1[[1]]/1000, index = "weigthed.NODF")
+networklevel(nulls2[[1]]/10000, index = "weigthed.NODF")
+networklevel(nulls3[[1]]/100000, index = "weigthed.NODF")
+```
+
+## Calculate network level metrics:
+
+```{r}
 indices <- as.list(c("number of species",
                      "connectance", 
                      "weighted NODF",
@@ -95,13 +190,154 @@ indices <- as.list(c("number of species",
                      "Alatalo interaction evenness"))
 ```
 
+```{r}
+# Progress bar initialization
+pb <- txtProgressBar(min = 0, max = length(nets), style = 3)
+
+# Initialize web.metrics list
+web.metrics <- lapply(1:length(vaznull.list), function(x) vector("list", 1000))
+
+# Function to compute bipartite metrics
+compute_bipartite_metrics <- function(net) {
+  m.bipart <- networklevel(net, indices)
+  return(as.data.frame(t(m.bipart)))
+}
+
+# Function to compute modularity
+compute_modularity <- function(net) {
+  mod <- computeModules(net)
+  return(mod@likelihood)
+}
+
+# Function to compute igraph metrics
+compute_igraph_metrics <- function(net) {
+  inet <- graph_from_biadjacency_matrix(net, weighted = TRUE, add.names = NULL)
+  assortativity <- assortativity_degree(inet)
+  eigen.centrality <- eigen_centrality(inet)$value
+  centr_binary <- centr_eigen(inet, scale = TRUE, normalized = TRUE)$centralization
+  centr_weighted_obs <- sum(max(eigen_centrality(inet)$vector) - eigen_centrality(inet)$vector)
+  centralization_w <- centr_weighted_obs / centr_eigen(inet)$theoretical_max
+  return(cbind(assortativity, eigen.centrality, centr_binary, centralization_w))
+}
+
+# Umbrella function to process each network and iteration
+process_network <- function(i, null_list) {
+  
+  net_nulls <- null_list[[i]]
+  
+  metrics_list <- lapply(1:1000, function(j) {
+    
+    m.bipart <- compute_bipartite_metrics(net_nulls[[j]])
+    
+    M <- compute_modularity(net_nulls[[j]])
+    
+    igraph.metrics <- compute_igraph_metrics(net_nulls[[j]])
+    
+    # Merge all metrics
+    metrics.nulls <- cbind(m.bipart, M, igraph.metrics) %>%
+      select_all(~gsub("\\s+", ".", .)) %>%
+      mutate(net_size = number.of.species.HL * number.of.species.LL,
+             iter = j)
+    
+    # Add type and net_id
+    if (str_detect(names(null_list)[i], "_int")) {
+      metrics.nulls <- metrics.nulls %>%
+        mutate(type = "ind", net_id = str_sub(names(null_list)[i], 1, 5))
+    } else {
+      metrics.nulls <- metrics.nulls %>%
+        mutate(type = "sp", net_id = str_sub(names(null_list)[i], 4, 8))
+    }
+    
+    return(metrics.nulls)
+  })
+  
+  return(metrics_list)
+}
+```
+
+Run umbrella function for each *Vazquez* null model network:
+
+```{r}
+# Main lapply for each network
+web.metrics <- lapply(1:length(vaznull.list), function(i) {
+  metrics <- process_network(i, vaznull.list)
+  
+  # Update progress bar
+  setTxtProgressBar(pb, i)
+  
+  return(metrics)
+})
+
+# Close progress bar
+close(pb)
+```
+
+Makes one data.table from a list of many
+
+```{r}
+web.metrics.df <- data.table::rbindlist(
+  lapply(1:length(web.metrics), function(i) {
+  data.table::rbindlist(web.metrics[[i]])
+  })
+  )
+
+web.metrics.df <- web.metrics.df |> 
+  relocate(type, .before = everything()) |> 
+  relocate(net_id, .after = type) |> 
+  relocate(iter, .after = net_id) |> 
+  mutate(net_code = paste0(type, "_", net_id)) |> 
+  group_by(iter) |> 
+  mutate(net_n = order(net_code))
+
+glimpse(web.metrics.df)
+```
+
+
+Run umbrella function for each *Patefield* null model network:
+
+```{r}
+web.metrics.pat <- lapply(1:length(null.list), function(i) {
+  metrics <- process_network(i, null.list)
+  
+  # Update progress bar
+  setTxtProgressBar(pb, i)
+  
+  return(metrics)
+})
+
+web.metrics.pat.df <- data.table::rbindlist(
+  lapply(1:length(web.metrics.pat), function(i) {
+  data.table::rbindlist(web.metrics.pat[[i]])
+  })
+  )
+
+web.metrics.pat.df <- web.metrics.pat.df |> 
+  relocate(type, .before = everything()) |> 
+  relocate(net_id, .after = type) |> 
+  relocate(iter, .after = net_id) |> 
+  mutate(net_code = paste0(type, "_", net_id)) |> 
+  group_by(iter) |> 
+  mutate(net_n = order(net_code))
+
+glimpse(web.metrics.pat.df)
+```
+
+
+```{r}
+saveRDS(web.metrics.df, here("data/net_level_nulls_vazquez.rds"))
+
+saveRDS(web.metrics.pat.df, here("data/net_level_nulls.rds"))
+```
+
 
 ```{r eval = FALSE}
 pb = txtProgressBar(min = 0, max = length(nets), style = 3) 
 
-web.metrics <- data.frame()
+web.metrics <- vector("list", 105)
 
-for (i in 1:length(null.list)) {
+lapply(web.metrics, FUN = function(x){vector("list", 1000)})
+
+parallel(i in 1:length(null.list)) {
   
   net_nulls <- null.list[[i]]
   
@@ -145,7 +381,7 @@ for (i in 1:length(null.list)) {
       
     }
     
-    web.metrics <- rbind(web.metrics, metrics.nulls)
+    web.metrics[[i]][[j]] <- metrics.nulls
     
   }
 
@@ -165,9 +401,5 @@ web.metrics <- web.metrics |>
 glimpse(web.metrics)
 ```
 
-
-```{r eval = FALSE}
-saveRDS(web.metrics, here("data/net_level_nulls.rds"))
-```
 
 
