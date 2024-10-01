@@ -217,12 +217,12 @@ process_network <- function(i, null_list) {
              iter = j)
     
     # Add type and net_id
-    if (str_detect(names(null_list)[i], "_int")) {
-      metrics.nulls <- metrics.nulls %>%
-        mutate(type = "ind", net_id = str_sub(names(null_list)[i], 1, 5))
-    } else {
+    if (str_detect(names(null_list)[i], "sp")) {
       metrics.nulls <- metrics.nulls %>%
         mutate(type = "sp", net_id = str_sub(names(null_list)[i], 4, 8))
+    } else {
+      metrics.nulls <- metrics.nulls %>%
+        mutate(type = "ind", net_id = str_sub(names(null_list)[i], 1, 5))
     }
     
     return(metrics.nulls)
@@ -246,8 +246,6 @@ web.metrics <- lapply(1:length(vaznull.list), function(i) {
 })
 ```
 
-#ELENA UNTIL HEREEEEE!!!!! 
-
 Makes one data.table from a list of many
 
 ```{r}
@@ -266,10 +264,7 @@ web.metrics.df <- web.metrics.df |>
   mutate(net_n = order(net_code))
 
 glimpse(web.metrics.df)
-```
 
-
-```{r}
 saveRDS(web.metrics.df, here("data/net_level_nulls_vazquez.rds"))
 ```
 
@@ -277,34 +272,31 @@ saveRDS(web.metrics.df, here("data/net_level_nulls_vazquez.rds"))
 Run umbrella function for each *Patefield* null model network:
 
 ```{r}
-# web.metrics.pat <- lapply(1:length(null.list), function(i) {
-#   metrics <- process_network(i, null.list)
-#   
-#   # Update progress bar
-#   setTxtProgressBar(pb, i)
-#   
-#   return(metrics)
-# })
-# 
-# web.metrics.pat.df <- data.table::rbindlist(
-#   lapply(1:length(web.metrics.pat), function(i) {
-#   data.table::rbindlist(web.metrics.pat[[i]])
-#   })
-#   )
-# 
-# web.metrics.pat.df <- web.metrics.pat.df |> 
-#   relocate(type, .before = everything()) |> 
-#   relocate(net_id, .after = type) |> 
-#   relocate(iter, .after = net_id) |> 
-#   mutate(net_code = paste0(type, "_", net_id)) |> 
-#   group_by(iter) |> 
-#   mutate(net_n = order(net_code))
-# 
-# glimpse(web.metrics.pat.df)
-```
+web.metrics.pat <- lapply(1:length(null.list), function(i) {
+  metrics <- process_network(i, null.list)
 
+  # Update progress bar
+  setTxtProgressBar(pb, i)
 
-```{r}
+  return(metrics)
+})
+
+web.metrics.pat.df <- data.table::rbindlist(
+  lapply(1:length(web.metrics.pat), function(i) {
+  data.table::rbindlist(web.metrics.pat[[i]])
+  })
+  )
+
+web.metrics.pat.df <- web.metrics.pat.df |>
+  relocate(type, .before = everything()) |>
+  relocate(net_id, .after = type) |>
+  relocate(iter, .after = net_id) |>
+  mutate(net_code = paste0(type, "_", net_id)) |>
+  group_by(iter) |>
+  mutate(net_n = order(net_code))
+
+glimpse(web.metrics.pat.df)
+
 saveRDS(web.metrics.pat.df, here("data/net_level_nulls.rds"))
 ```
 
@@ -346,10 +338,9 @@ reshape2::melt(c) %>% summarise(mean(value))
 
 d = lapply(nulls1, compute_bipartite_metrics) 
 d = reshape2::melt(d)
-
 ```
 
-```{r eval = FALSE}
+```{r eval = FALSE, include=FALSE}
 pb = txtProgressBar(min = 0, max = length(nets), style = 3) 
 
 web.metrics <- vector("list", 105)
