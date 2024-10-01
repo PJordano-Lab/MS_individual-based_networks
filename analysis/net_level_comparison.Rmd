@@ -304,6 +304,54 @@ p3 / p4 + plot_layout(guides = "collect")
 2nd Alternative fig 2:
 
 ```{r fig.height=6, fig.width=9}
+p3 <- obs.metrics.long |>
+  rename(value = value_obs) |> 
+  mutate(basis_of_value = "obs") |> 
+  mutate(metric = as.factor(recode(metric, 
+                         "M" = "Modularity",
+                         "assortativity" = "Assortativity",
+                         "centralization.w" = "Centralization",
+                         "connectance" = "Connectance",
+                         "interaction.evenness" = "Interaction evenness",
+                         "weighted.NODF" = "Weighted NODF")) |> 
+                    fct_relevel("Connectance", "Weighted NODF", "Modularity", 
+                                "Interaction evenness", "Assortativity", "Centralization"))  |> 
+  ggplot(aes(x = type, y = value, color = type, fill = type)) +
+  geom_boxplot(outliers = FALSE, alpha = 0.4) + # color = "goldenrod", fill =  "goldenrod"
+  scale_color_manual(values = c("goldenrod", "grey40")) + 
+  scale_fill_manual(values = c("goldenrod", "grey40")) +
+  facet_wrap(~metric, scales = "free", nrow = 1) +
+  labs(x = NULL, y = NULL, subtitle = "Observed values")
+
+p4 <- null.metrics.long |> 
+  mutate(basis_of_value = "difference\n(obs - null)") |> 
+  mutate(null_metric = paste(metric, null)) |> 
+  filter(null_metric %in% c("connectance Patefield", "M Vazquez", "assortativity Vazquez",                         
+                            "centralization.w Vazquez", "interaction.evenness Vazquez", "weighted.NODF Vazquez")) |>
+  left_join(obs.metrics.long) |> 
+  mutate(diff = (value_obs - value)) |> 
+  mutate(metric = as.factor(recode(metric, 
+                         "M" = "Modularity",
+                         "assortativity" = "Assortativity",
+                         "centralization.w" = "Centralization",
+                         "connectance" = "Connectance",
+                         "interaction.evenness" = "Interaction evenness",
+                         "weighted.NODF" = "Weighted NODF")) |> 
+                    fct_relevel("Connectance", "Weighted NODF", "Modularity", 
+                                "Interaction evenness", "Assortativity", "Centralization")) |> 
+  ggplot(aes(x = type, y = diff, color = type, fill = type)) +
+  geom_boxplot(outliers = FALSE, alpha = 0.4) +# color = "grey40", fill =  "grey40"
+  scale_color_manual(values = c("goldenrod", "grey40")) + 
+  scale_fill_manual(values = c("goldenrod", "grey40")) +
+  facet_wrap(~metric, scales = "free", nrow = 1) +
+  labs(x = NULL, y = NULL, subtitle = "Difference from random expectation")
+
+p3 / p4 + plot_layout(guides = "collect")
+```
+
+3rd alternative to fig:
+
+```{r fig.height=6, fig.width=9}
 p5 <- obs.metrics.long |> 
   mutate(basis_of_value = "observed") |> 
   mutate(metric = as.factor(recode(metric, 
