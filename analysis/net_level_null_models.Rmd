@@ -21,104 +21,102 @@ library(igraph)
 library(tnet)
 ```
 
+## Read networks
+
+1. Read individual-based networks:
+
+```{r message=FALSE, results='hide'}
+ind.files <- list.files(here("networks/nets_raw"))
+
+nets.ind <- str_sub(ind.files, 1, 5)
+
+#remove small nets
+nets.selec.ind <- nets.ind[! nets.ind %in% c("08_01", "12_01", "12_06", "12_07")]
+
+nets.ind <- list()
+
+for (i in 1:length(nets.selec.ind)) {
+  
+  print(nets.selec.ind[i])
+    
+    net <- read_csv(here::here(paste0("networks/nets_raw/",
+                                        nets.selec.ind[i],
+                                        "_int.csv")))
+
+    nets.ind[[i]] <- net
+    names(nets.ind)[i] <- nets.selec.ind[i]
+
+}
+```
+
+
+2. Read species-based networks:
+
+```{r message=FALSE, results='hide'}
+sp.files <- list.files(here("networks/nets_sp_raw"))
+
+nets.sp <- str_sub(sp.files, 1, 8)
+
+#remove small nets
+nets.selec.sp <- nets.sp[! nets.sp %in% c("sp_03_01", "sp_03_02",
+                                          "sp_03_03", "sp_03_04",
+                                          "sp_05_01", "sp_09_01",
+                                          "sp_29_12", "sp_31_01",
+                                          "sp_44_01")]
+
+nets.sp <- list()
+
+for (i in 1:length(nets.selec.sp)) {
+    
+    print(nets.selec.sp[i])
+    
+    net <- read.csv(here::here(paste0("networks/nets_sp_raw/",
+                                        nets.selec.sp[i],
+                                        ".csv")), sep = ";")
+
+   nets.sp[[i]] <- net
+   names(nets.sp)[i] <- nets.selec.sp[i]
+  
+}
+```
+
+3rd. combine all nets, convert to matrix format and ceiling to have integer values:
+
+```{r}
+nets <- c(nets.ind, nets.sp)
+
+convert_to_matrix <- function(net){
+  if(colnames(net)[1] == "ind"){
+    net <- net |> column_to_rownames("ind")
+  }
+  else{
+    net <- net |> column_to_rownames("sp")
+  }
+  
+  net <- ceiling(net)
+}
+
+nets <- lapply(nets, convert_to_matrix)
+```
+
+
 
 ## NULL MODELS
-
-Read matrices:
-
-First I create a function to calculate for each matrix, the scale factor necessary so that every non-zero value has at least number different that zero before the decimals. Then I do a ceiling (function to round interaction to integers). By using a scale factor decimals are not lost.
-
-```{r}
-#Read list of names
-
-net_names <- list.files(path = here("networks/nets_std"), pattern = "_int")
-
-#Create empty list
-
-nets <- list()
-
-#Add all read files to the list
-
-for (i in 1:length(net_names)){
-  
-  net_file <- paste0("networks/nets_std/", net_names[[i]])
-  net <- read.csv(here(net_file))
-  
-  if (str_detect(net_names[i], "sp_")) {
-    
-    net %<>% column_to_rownames("sp")
-    
-  }
-  
-  else {
-    
-    net %<>% column_to_rownames("ind")
-    
-  }
-  
-  nets[[i]] <- net #add to list
-  names(nets)[i] <- net_names[[i]] #name the list
-  
-}
-
-```
-
-First I create a function to calculate for each matrix, the scale factor necessary so that every non-zero value has at least number different that zero before the decimals. Then I do a ceiling (function to round interaction to integers). By using a scale factor small decimals are not lost.
-
-```{r}
-calc_order_magnitude <- function(matrix) {
-  # Excluir ceros para evitar división por cero
-  non_zero_values <- matrix[matrix != 0]
-  
-  # Obtener el valor mínimo absoluto de los valores no cero
-  min_value <- min(abs(non_zero_values))
-  
-  # Calcular el orden de magnitud necesario para convertirlo en un número mayor o igual a 1
-  order_magnitude <- 10^ceiling(-log10(min_value))
-  
-  return(order_magnitude)
-}
-
-# Calcular el factor de escala para todas las redes
-scale_factors <- lapply(nets, calc_order_magnitude)
-
-```
-
-```{r}
-nets_multiplied <- list()
-
-for (i in 1:length(nets)){
-  
-  nets_multiplied[[i]] <- ceiling(nets[[i]] * scale_factors[[i]])
-  
-  names(nets_multiplied)[i] <- net_names[[i]] #name the list
-
-}
-```
-
 
 Generate 1000 random nets following *Patefield*'s algorithm (keeps constant marginal rows and columns)
 
 ```{r}
-null.list <- list()
-#null.list <- vector("list", 5)
+null.list <- vector("list", 105)
 
-for (i in 1:length(nets_multiplied)) {
+for (i in 1:length(nets)) {
   
   print(i)
   
-  nulls <- nullmodel(nets_multiplied[[i]], N = 1000, method = "r2dtable") 
+  nulls <- nullmodel(nets[[i]], N = 1000, method = "r2dtable") 
+
+  null.list[[i]] <- nulls
   
-  scale_back <- function(list){
-    list / scale_factors[[i]]
-    }
-  
-  nulls.fix <- lapply(nulls, scale_back)
-  
-  null.list <- append(null.list, list(nulls.fix))
-  #null.list[[i]] <- nulls.fix
-  
-  names(null.list)[[i]] <- names(nets_multiplied)[i]
+  names(null.list)[[i]] <- names(nets)[i]
   
 }
 ```
@@ -127,33 +125,119 @@ Generate 1000 random nets following *Vazquez* algorithm (keeps constant marginal
 
 ```{r}
 #vaznull.list <- list()
-vaznull.list <- vector("list", 5)
+vaznull.list <- vector("list", 105)
 
-for (i in 1:length(nets_multiplied)) {
+for (i in 1:length(nets)) {
   
   print(i)
   
-  nulls <- nullmodel(nets_multiplied[[i]], N = 1000, method = "vaznull")
+  nulls <- nullmodel(nets[[i]], N = 1000, method = "vaznull")
   
-  scale_back <- function(list){
-    list / scale_factors[[i]]
-    }
+  #vaznull.list <- append(vaznull.list, list(nulls))
+  vaznull.list[[i]] <- nulls
   
-  nulls.fix <- lapply(nulls, scale_back)
-  
-  #vaznull.list <- append(vaznull.list, list(nulls.fix))
-  vaznull.list[[i]] <- nulls.fix
-  
-  names(vaznull.list)[[i]] <- names(nets_multiplied)[i]
+  names(vaznull.list)[[i]] <- names(nets)[i]
   
 }
 ```
 
-Check Vazquez null models sum up to 1:
+Control ind-based nets by sampling effort when needed: 
 
 ```{r}
-sum(vaznull.list[[1]][[1]])
-sum(vaznull.list[[81]][[981]])
+## Read sampling effort parameters:
+params <- read_csv2(here("networks/nets_se/nets_parameters.csv")) |> 
+  mutate(type = str_sub(net_code, 1,3))
+
+# List of individual-based networks
+net_id <- params$net_id
+# List of sampling effort for each individual-based networks
+se_net <- params$sampling_effort
+# List of whether individuals require controlling by sampling effort
+control_needed <- params$necessary_stand
+
+# Read info on sampling effort for individual-based network:
+nets.ind.se <- list()
+
+for (i in 1:length(nets.selec.ind)) {
+  
+  if (control_needed[i] == "YES") {
+    
+    print(net_id[i])
+    
+    effort <- read_csv(here::here(paste0("networks/nets_se/",
+                                         nets.selec.ind[i],
+                                         "_attr.csv"))) |>
+      select(ind, SE = se_net[i]) |> 
+      mutate(ind = as.character(ind))
+
+    nets.ind.se[[i]] <- effort
+    names(nets.ind.se)[i] <- nets.selec.ind[i]
+  
+  }
+  else {
+  }
+}
+```
+
+```{r}
+## Divide null model networks that need control by sampling effort:
+
+control_se <- function(net_list, i) {
+  
+  # Check if control is needed and type is 'ind'
+  if (control_needed[i] == "YES" & params$type[i] == "ind") {
+    print(i)
+    
+    # Apply to each of the 1000 networks (j)
+    net_list <- lapply(net_list, function(net) {
+      
+      net_se <- net %>%
+        as.data.frame() %>%
+        rownames_to_column("ind") %>%
+        mutate(ind = as.character(ind)) %>%
+        pivot_longer(cols = -1, names_to = "animal", values_to = "int") %>%
+        left_join(nets.ind.se[[i]], by = "ind") %>%
+        mutate(int = int / SE) %>%
+        pivot_wider(names_from = animal, values_from = int) %>%
+        select(-SE) %>%
+        column_to_rownames("ind")
+      
+      return(net_se)
+    })
+  }
+  
+  return(net_list)
+}
+
+# Apply the control_se function to null models list using lapply
+null.list.se <- lapply(seq_along(null.list), function(i) control_se(null.list[[i]], i))
+names(null.list.se) <- names(null.list)
+
+vaznull.list.se <- lapply(seq_along(vaznull.list), function(i) control_se(vaznull.list[[i]], i))
+names(vaznull.list.se) <- names(vaznull.list)
+```
+
+Standardize all matrices for subsequent analysis:
+
+```{r, message=FALSE, results='hide'}
+# Function to apply gts transformation to a single network
+gts <- function(net) {
+  mat_gts <- net / sum(net)
+  return(mat_gts)
+}
+
+# Function to apply gts to a list of networks (nested lists)
+gts_list <- function(net_list) {
+  # Use lapply to apply 'gts' to each element in the sublist
+  return(lapply(net_list, gts))
+}
+
+# Apply the gts_list function to the main list (nested lists)
+null.list.std <- lapply(null.list.se, gts_list)
+names(null.list.std) <- names(null.list)
+
+vaznull.list.std <- lapply(vaznull.list.se, gts_list)
+names(vaznull.list.std) <- names(vaznull.list)
 ```
 
 
@@ -202,7 +286,7 @@ process_network <- function(i, null_list) {
   
   net_nulls <- null_list[[i]]
   
-  metrics_list <- lapply(1:1000, function(j) {
+  metrics_list <- lapply(1:10, function(j) {
     
     m.bipart <- compute_bipartite_metrics(net_nulls[[j]])
     
@@ -236,8 +320,8 @@ Run umbrella function for each *Vazquez* null model network:
 
 ```{r}
 # Main lapply for each network
-web.metrics <- lapply(1:length(vaznull.list), function(i) {
-  metrics <- process_network(i, vaznull.list)
+web.metrics <- lapply(1:length(vaznull.list.std), function(i) {
+  metrics <- process_network(i, vaznull.list.std)
   
   # Update progress bar
   setTxtProgressBar(pb, i)
@@ -265,15 +349,15 @@ web.metrics.df <- web.metrics.df |>
 
 glimpse(web.metrics.df)
 
-saveRDS(web.metrics.df, here("data/net_level_nulls_vazquez.rds"))
+saveRDS(web.metrics.df, here("data/net_level_nulls_vaz.rds"))
 ```
 
 
 Run umbrella function for each *Patefield* null model network:
 
 ```{r}
-web.metrics.pat <- lapply(1:length(null.list), function(i) {
-  metrics <- process_network(i, null.list)
+web.metrics.pat <- lapply(1:length(null.list.std), function(i) {
+  metrics <- process_network(i, null.list.std)
 
   # Update progress bar
   setTxtProgressBar(pb, i)
@@ -297,118 +381,7 @@ web.metrics.pat.df <- web.metrics.pat.df |>
 
 glimpse(web.metrics.pat.df)
 
-saveRDS(web.metrics.pat.df, here("data/net_level_nulls.rds"))
-```
-
-
-Compare null models for same net using different scale factors (e.g. 1000, 10000 and 100000):
-
-```{r, eval=FALSE, include=FALSE}
-nulls1 <- nullmodel(nets[[7]]*1000, N = 10, method = "vaznull")
-nulls2 <- nullmodel(nets[[7]]*10000, N = 10, method = "vaznull")
-nulls3 <- nullmodel(nets[[7]]*100000, N = 10, method = "vaznull")
-
-sum(nets[[7]])
-sum(nulls1[[1]]/1000)
-sum(nulls1[[3]]/1000)
-sum(nulls2[[1]]/10000)
-sum(nulls2[[3]]/10000)
-sum(nulls3[[5]]/100000)
-sum(nulls3[[9]]/100000)
-
-networklevel(nets[[7]], index = "connectance")
-networklevel(nulls1[[1]]/1000, index = "connectance")
-networklevel(nulls2[[1]]/10000, index = "connectance")
-networklevel(nulls3[[1]]/100000, index = "connectance")
-
-networklevel(nets[[7]], index = "weighted NODF")
-
-wNODF = function(net, factor){
-  a = networklevel(net/factor, index = "weighted NODF")
-  return(as.numeric(a))
-  }
-
-a = lapply(nulls1, wNODF, factor = 1000)
-b = lapply(nulls2, wNODF, factor = 10000)
-c = lapply(nulls3, wNODF, factor = 100000)
-
-reshape2::melt(a) %>% summarise(mean(value))
-reshape2::melt(b) %>% summarise(mean(value))
-reshape2::melt(c) %>% summarise(mean(value))
-
-d = lapply(nulls1, compute_bipartite_metrics) 
-d = reshape2::melt(d)
-```
-
-```{r eval = FALSE, include=FALSE}
-pb = txtProgressBar(min = 0, max = length(nets), style = 3) 
-
-web.metrics <- vector("list", 105)
-
-lapply(web.metrics, FUN = function(x){vector("list", 1000)})
-
-parallel(i in 1:length(null.list)) {
-  
-  net_nulls <- null.list[[i]]
-  
-  for (j in 1:1000) {
-    
-    m.bipart <- networklevel(net_nulls[[j]], indices)
-    m.bipart <- as.data.frame(t(m.bipart))  
-    
-    # Modularity (bipartite)
-    mod <- computeModules(net_nulls[[j]])
-    M = mod@likelihood
-    
-    # Igraph metrics
-    inet <- graph_from_biadjacency_matrix(net_nulls[[j]], weighted = T,  add.names=NULL)
-    assortativity = assortativity_degree(inet)
-    eigen.centrality = eigen_centrality(inet)$value
-    centr_binary = centr_eigen(inet, scale = TRUE, normalized = TRUE)$centralization
-    centr.weighted.obs = sum(max(eigen_centrality(inet)$vector) - eigen_centrality(inet)$vector)
-    centralization.w = centr.weighted.obs/ centr_eigen(inet)$theoretical_max
-    igraph.metrics <- cbind(assortativity, eigen.centrality, centr_binary, centralization.w)
-    
-    #merge all metrics
-    metrics.nulls <- cbind(m.bipart, M, igraph.metrics) |> 
-      select_all(~gsub("\\s+", ".", .)) |> 
-      mutate(net_size = number.of.species.HL * number.of.species.LL) |> 
-      mutate(iter = j) 
-    
-    if (str_detect(names(null.list)[i], "_int")) {
-      
-      metrics.nulls <- metrics.nulls |> 
-        mutate(type = "ind",
-               net_id = str_sub(names(null.list)[i], 1, 5))
-      
-    }
-    
-    else {
-      
-      metrics.nulls <- metrics.nulls |> 
-        mutate(type = "sp",
-               net_id = str_sub(names(null.list)[i], 4, 8))
-      
-    }
-    
-    web.metrics[[i]][[j]] <- metrics.nulls
-    
-  }
-
-   setTxtProgressBar(pb,i)
-  
-}
-
-
-web.metrics <- web.metrics |> 
-  relocate(type, .before = everything()) |> 
-  relocate(net_id, .after = type) |> 
-  relocate(iter, .after = net_id) |> 
-  mutate(net_code = paste0(type, "_", net_id)) |> 
-  group_by(iter) |> 
-  mutate(net_n = order(net_code))
-
-glimpse(web.metrics)
+saveRDS(web.metrics.pat.df, here("data/net_level_nulls_pat.rds"))
 ```
 
 
