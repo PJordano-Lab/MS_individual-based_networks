@@ -156,7 +156,7 @@ se_net <- params$sampling_effort
 control_needed <- params$necessary_stand
 
 # Read info on sampling effort for individual-based network:
-nets.ind.se <- list()
+nets.ind.se <- data.frame()
 
 for (i in 1:length(nets.selec.ind)) {
   
@@ -168,16 +168,17 @@ for (i in 1:length(nets.selec.ind)) {
                                          nets.selec.ind[i],
                                          "_attr.csv"))) |>
       select(ind, SE = se_net[i]) |> 
-      mutate(ind = as.character(ind))
+      mutate(net_id = nets.selec.ind[i],
+             ind = as.character(ind)) 
 
-    nets.ind.se[[i]] <- effort
-    names(nets.ind.se)[i] <- nets.selec.ind[i]
+    nets.ind.se <- rbind(nets.ind.se, effort)
   
   }
   else {
   }
 }
 ```
+
 
 ```{r}
 ## Divide null model networks that need control by sampling effort:
@@ -191,9 +192,18 @@ control_se <- function(net_list, i) {
     # Apply to each of the 1000 networks (j)
     net_list <- lapply(net_list, function(net) {
       
-      net <- net/nets.ind.se[[i]][[2]]
+      net_se <- net %>%
+        as.data.frame() %>%
+        rownames_to_column("ind") %>%
+        mutate(ind = as.character(ind)) %>%
+        pivot_longer(cols = -1, names_to = "animal", values_to = "int") %>%
+        left_join(nets.ind.se[[i]], by = "ind") %>%
+        mutate(int = int / SE) %>%
+        pivot_wider(names_from = animal, values_from = int) %>%
+        select(-SE) %>%
+        column_to_rownames("ind")
       
-      return(net)
+      return(net_se)
     })
   }
   
@@ -207,6 +217,9 @@ names(null.list.se) <- names(null.list)
 vaznull.list.se <- lapply(seq_along(vaznull.list), function(i) control_se(vaznull.list[[i]], i))
 names(vaznull.list.se) <- names(vaznull.list)
 ```
+
+
+
 
 Standardize all matrices for subsequent analysis:
 
