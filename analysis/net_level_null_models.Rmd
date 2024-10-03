@@ -286,7 +286,7 @@ process_network <- function(i, null_list) {
   
   net_nulls <- null_list[[i]]
   
-  metrics_list <- lapply(1:10, function(j) {
+  metrics_list <- lapply(1:1000, function(j) {
     
     m.bipart <- compute_bipartite_metrics(net_nulls[[j]])
     
