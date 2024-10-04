@@ -106,37 +106,46 @@ nets <- lapply(nets, convert_to_matrix)
 Generate 1000 random nets following *Patefield*'s algorithm (keeps constant marginal rows and columns)
 
 ```{r}
-null.list <- vector("list", 105)
+pat.null.list <- vector("list", 105)
 
 for (i in 1:length(nets)) {
   
   print(i)
   
   nulls <- nullmodel(nets[[i]], N = 1000, method = "r2dtable") 
-
-  null.list[[i]] <- nulls
   
-  names(null.list)[[i]] <- names(nets)[i]
+  #assign column and rownames
+  nulls <- lapply(nulls, function(mat) {
+     rownames(mat) <- rownames(nets[[i]])
+     colnames(mat) <- colnames(nets[[i]])
+     return(mat)})
+  
+  pat.null.list[[i]] <- nulls
+  
+  names(pat.null.list)[[i]] <- names(nets)[i]
   
 }
 ```
 
-Generate 1000 random nets following *Vazquez* algorithm (keeps constant marginal rows and columns)
+Generate 1000 random nets with *Swap* algorithm that keeps constant marginal totals and connectance
 
 ```{r}
-#vaznull.list <- list()
-vaznull.list <- vector("list", 105)
+swap.null.list <- vector("list", 105)
 
 for (i in 1:length(nets)) {
   
   print(i)
   
-  nulls <- nullmodel(nets[[i]], N = 1000, method = "vaznull")
+  nulls <- nullmodel(nets[[i]], N = 1000, method = "swap.web")
   
-  #vaznull.list <- append(vaznull.list, list(nulls))
-  vaznull.list[[i]] <- nulls
+  nulls <- lapply(nulls, function(mat) {
+     rownames(mat) <- rownames(nets[[i]])
+     colnames(mat) <- colnames(nets[[i]])
+     return(mat)})
   
-  names(vaznull.list)[[i]] <- names(nets)[i]
+  swap.null.list[[i]] <- nulls
+  
+  names(swap.null.list)[[i]] <- names(nets)[i]
   
 }
 ```
@@ -156,7 +165,8 @@ se_net <- params$sampling_effort
 control_needed <- params$necessary_stand
 
 # Read info on sampling effort for individual-based network:
-nets.ind.se <- data.frame()
+nets.ind.se <- list()
+#nets.ind.se <- data.frame()
 
 for (i in 1:length(nets.selec.ind)) {
   
@@ -171,7 +181,9 @@ for (i in 1:length(nets.selec.ind)) {
       mutate(net_id = nets.selec.ind[i],
              ind = as.character(ind)) 
 
-    nets.ind.se <- rbind(nets.ind.se, effort)
+    nets.ind.se[[i]] <- effort
+    names(nets.ind.se)[i] <- nets.selec.ind[i]
+    #nets.ind.se <- rbind(nets.ind.se, effort)
   
   }
   else {
@@ -183,14 +195,17 @@ for (i in 1:length(nets.selec.ind)) {
 ```{r}
 ## Divide null model networks that need control by sampling effort:
 
-control_se <- function(net_list, i) {
+pat.null.list.se <- vector("list", 105)
+
+for(i in 1:length(pat.null.list)) {
   
   # Check if control is needed and type is 'ind'
   if (control_needed[i] == "YES" & params$type[i] == "ind") {
+    
     print(i)
     
     # Apply to each of the 1000 networks (j)
-    net_list <- lapply(net_list, function(net) {
+    net_list <- lapply(pat.null.list[[i]], function(net) {
       
       net_se <- net %>%
         as.data.frame() %>%
@@ -200,26 +215,67 @@ control_se <- function(net_list, i) {
         left_join(nets.ind.se[[i]], by = "ind") %>%
         mutate(int = int / SE) %>%
         pivot_wider(names_from = animal, values_from = int) %>%
-        select(-SE) %>%
-        column_to_rownames("ind")
-      
-      return(net_se)
+        select(-c(SE, net_id)) %>%
+        column_to_rownames("ind") %>%
+        as.matrix()
+
     })
+    
+    pat.null.list.se[[i]] <- net_list
+    names(pat.null.list.se)[[i]] <- names(pat.null.list)[[i]]
   }
   
-  return(net_list)
+  else {
+    
+    pat.null.list.se[[i]] <- pat.null.list[[i]]
+    names(pat.null.list.se)[[i]] <- names(pat.null.list)[[i]]
+  }
 }
 
-# Apply the control_se function to null models list using lapply
-null.list.se <- lapply(seq_along(null.list), function(i) control_se(null.list[[i]], i))
-names(null.list.se) <- names(null.list)
-
-vaznull.list.se <- lapply(seq_along(vaznull.list), function(i) control_se(vaznull.list[[i]], i))
-names(vaznull.list.se) <- names(vaznull.list)
 ```
 
 
+```{r}
+## Divide null model networks that need control by sampling effort:
 
+swap.null.list.se <- vector("list", 105)
+
+for(i in 1:length(swap.null.list)) {
+  
+  # Check if control is needed and type is 'ind'
+  if (control_needed[i] == "YES" & params$type[i] == "ind") {
+    
+    print(i)
+    
+    # Apply to each of the 1000 networks (j)
+    net_list <- lapply(swap.null.list[[i]], function(net) {
+      
+      net_se <- net %>%
+        as.data.frame() %>%
+        rownames_to_column("ind") %>%
+        mutate(ind = as.character(ind)) %>%
+        pivot_longer(cols = -1, names_to = "animal", values_to = "int") %>%
+        left_join(nets.ind.se[[i]], by = "ind") %>%
+        mutate(int = int / SE) %>%
+        pivot_wider(names_from = animal, values_from = int) %>%
+        select(-c(SE, net_id)) %>%
+        column_to_rownames("ind") %>%
+        as.matrix()
+
+    })
+    
+    swap.null.list.se[[i]] <- net_list
+    names(swap.null.list.se)[[i]] <- names(swap.null.list)[[i]]
+  }
+  
+  else {
+    
+    swap.null.list.se[[i]] <- swap.null.list[[i]]
+    names(swap.null.list.se)[[i]] <- names(swap.null.list)[[i]]
+  }
+}
+
+```
 
 Standardize all matrices for subsequent analysis:
 
@@ -237,11 +293,11 @@ gts_list <- function(net_list) {
 }
 
 # Apply the gts_list function to the main list (nested lists)
-null.list.std <- lapply(null.list.se, gts_list)
-names(null.list.std) <- names(null.list)
+pat.null.list.std <- lapply(pat.null.list.se, gts_list)
+names(pat.null.list.std) <- names(pat.null.list)
 
-vaznull.list.std <- lapply(vaznull.list.se, gts_list)
-names(vaznull.list.std) <- names(vaznull.list)
+swap.null.list.std <- lapply(swap.null.list.se, gts_list)
+names(swap.null.list.std) <- names(swap.null.list)
 ```
 
 
@@ -260,7 +316,7 @@ indices <- as.list(c("number of species",
 pb <- txtProgressBar(min = 0, max = length(nets), style = 3)
 
 # Initialize web.metrics list
-web.metrics <- lapply(1:length(vaznull.list), function(x) vector("list", 1000))
+web.metrics <- lapply(1:length(pat.null.list), function(x) vector("list", 1000))
 
 # Function to compute bipartite metrics
 compute_bipartite_metrics <- function(net) {
@@ -320,12 +376,12 @@ process_network <- function(i, null_list) {
 }
 ```
 
-Run umbrella function for each *Vazquez* null model network:
+Run umbrella function for each *Patefield* null model network:
 
 ```{r}
 # Main lapply for each network
-web.metrics <- lapply(1:length(vaznull.list.std), function(i) {
-  metrics <- process_network(i, vaznull.list.std)
+web.metrics <- lapply(1:length(pat.null.list.std), function(i) {
+  metrics <- process_network(i, pat.null.list.std)
   
   # Update progress bar
   setTxtProgressBar(pb, i)
@@ -353,15 +409,15 @@ web.metrics.df <- web.metrics.df |>
 
 glimpse(web.metrics.df)
 
-saveRDS(web.metrics.df, here("data/net_level_nulls_vaz.rds"))
+saveRDS(web.metrics.df, here("data/net_level_nulls_pat.rds"))
 ```
 
 
-Run umbrella function for each *Patefield* null model network:
+Run umbrella function for each *Swap* null model network:
 
 ```{r}
-web.metrics.pat <- lapply(1:length(null.list.std), function(i) {
-  metrics <- process_network(i, null.list.std)
+web.metrics.swap <- lapply(1:length(swap.null.list.std), function(i) {
+  metrics <- process_network(i, swap.null.list.std)
 
   # Update progress bar
   setTxtProgressBar(pb, i)
@@ -369,13 +425,13 @@ web.metrics.pat <- lapply(1:length(null.list.std), function(i) {
   return(metrics)
 })
 
-web.metrics.pat.df <- data.table::rbindlist(
-  lapply(1:length(web.metrics.pat), function(i) {
-  data.table::rbindlist(web.metrics.pat[[i]])
+web.metrics.swap.df <- data.table::rbindlist(
+  lapply(1:length(web.metrics.swap), function(i) {
+  data.table::rbindlist(web.metrics.swap[[i]])
   })
   )
 
-web.metrics.pat.df <- web.metrics.pat.df |>
+web.metrics.swap.df <- web.metrics.swap.df |>
   relocate(type, .before = everything()) |>
   relocate(net_id, .after = type) |>
   relocate(iter, .after = net_id) |>
@@ -383,9 +439,9 @@ web.metrics.pat.df <- web.metrics.pat.df |>
   group_by(iter) |>
   mutate(net_n = order(net_code))
 
-glimpse(web.metrics.pat.df)
+glimpse(web.metrics.swap.df)
 
-saveRDS(web.metrics.pat.df, here("data/net_level_nulls_pat.rds"))
+saveRDS(web.metrics.swap.df, here("data/net_level_nulls_swap.rds"))
 ```
 
 ```{r}
