@@ -29,7 +29,7 @@ Load observed net-level metrics:
 
 ```{r}
 net.level <- read.csv(here("data/net.level.selection.csv")) %>%
-  mutate(type = recode(type, "ind"="ind-based", "sp"="sp-based"))
+  mutate(type = recode(type, "ind" = "ind-based", "sp" = "sp-based"))
 
 #glimpse(net.level)
 ```
@@ -38,10 +38,10 @@ net.level <- read.csv(here("data/net.level.selection.csv")) %>%
 Load null model derived net-level metrics:
 
 ```{r}
-nulls.v <- read_rds(here("data/net_level_nulls_vazquez.rds")) |> 
+nulls.s <- read_rds(here("data/net_level_nulls_swap.rds")) |> 
   rename(centralization.w = centralization_w)
 
-nulls.p <- read_rds(here("data/net_level_nulls.rds")) |> 
+nulls.p <- read_rds(here("data/net_level_nulls_pat.rds")) |> 
   rename(centralization.w = centralization_w)
 ```
 
@@ -63,15 +63,24 @@ Convert dataframes to long format:
 obs.metrics.long <- net.level |> 
   select(net_id, net_n, net_size, type_long = type, all_of(metrics.of.interest)) |> 
   pivot_longer(cols = -c(1:4), names_to = "metric", values_to = "value_obs") |> 
-  mutate(type = ifelse(type_long == "ind-based", "ind", "sp"))
+  mutate(type = ifelse(type_long == "ind-based", "ind", "sp")) |> 
+  mutate(metric2 = as.factor(recode(metric, 
+                         "M" = "Modularity",
+                         "assortativity" = "Assortativity",
+                         "centralization.w" = "Centralization",
+                         "connectance" = "Connectance",
+                         "interaction.evenness" = "Interaction evenness",
+                         "weighted.NODF" = "Weighted NODF")) |> 
+                    fct_relevel("Connectance", "Weighted NODF", "Modularity", "Interaction evenness",
+                                "Assortativity", "Centralization"))
 #630 observations
 
-null.metrics.long.v <- nulls.v |> 
+null.metrics.long.s <- nulls.s |> 
   ungroup() |> 
   select(net_code, net_n, net_size, type, all_of(metrics.of.interest)) |> 
   pivot_longer(cols = -c(net_code, net_n, net_size, type),
                names_to = "metric", values_to = "value") |> 
-  mutate(null = "Vazquez")
+  mutate(null = "Swap")
 
 null.metrics.long.p <- nulls.p |> 
   ungroup() |> 
@@ -80,37 +89,23 @@ null.metrics.long.p <- nulls.p |>
                names_to = "metric", values_to = "value") |> 
   mutate(null = "Patefield")
 
-null.metrics.long <- full_join(null.metrics.long.v, null.metrics.long.p)
+null.metrics.long <- full_join(null.metrics.long.s, null.metrics.long.p)
 #1,260,000 observations
+
+null.metrics.long.selec <- null.metrics.long |> 
+  mutate(null_metric = paste(metric, null)) |> 
+  filter(null_metric %in% c("connectance Patefield", "M Swap", "assortativity Swap",
+                            "centralization.w Swap", "interaction.evenness Swap", "weighted.NODF Swap")) |> 
+  mutate(metric2 = as.factor(recode(metric, 
+                         "M" = "Modularity",
+                         "assortativity" = "Assortativity",
+                         "centralization.w" = "Centralization",
+                         "connectance" = "Connectance",
+                         "interaction.evenness" = "Interaction evenness",
+                         "weighted.NODF" = "Weighted NODF")) |> 
+                    fct_relevel("Connectance", "Weighted NODF", "Modularity", "Interaction evenness",
+                                "Assortativity", "Centralization"))
 ```
-
-
-Summarize null model metrics:
-
-```{r}
-null.data.sum.v <- nulls.v |> 
-  select(type, net_id, iter, all_of(metrics.of.interest)) |> 
-  pivot_longer(cols = -c(1:3), names_to = "metric", values_to = "value") |> 
-  group_by(type, net_id, metric) |> 
-  summarise(mean_nulls = mean(value),
-            sd_nulls = sd(value)) |> 
-  mutate(null = "Vazquez")
-
-null.data.sum.p <- nulls.p |> 
-  select(type, net_id, iter, all_of(metrics.of.interest)) |> 
-  pivot_longer(cols = -c(1:3), names_to = "metric", values_to = "value") |> 
-  group_by(type, net_id, metric) |> 
-  summarise(mean_nulls = mean(value),
-            sd_nulls = sd(value)) |> 
-  mutate(null = "Patefield")
-
-null.data.sum <- full_join(null.data.sum.v, null.data.sum.p)|> 
-  left_join(obs.metrics.long) |> 
-  mutate(z_score = (value_obs - mean_nulls) / sd_nulls,
-         diff_nulls = (value_obs - mean_nulls))
-
-```
-
 
 Check null-models metrics distribution:
 
@@ -133,21 +128,42 @@ plot.fun <- function(metric, null_type) {
   }
 
 plot.fun("connectance", "Patefield")
-plot.fun("weighted.NODF", "Vazquez")
-plot.fun("interaction.evenness", "Vazquez")
-plot.fun("M", "Vazquez")
-plot.fun("assortativity", "Vazquez")
-plot.fun("centralization.w", "Vazquez")
-
+plot.fun("weighted.NODF", "Swap")
+plot.fun("interaction.evenness", "Swap")
+plot.fun("M", "Swap")
+plot.fun("assortativity", "Swap")
+plot.fun("centralization.w", "Swap")
 ```
 
-Plot to compare network types:
 
-```{r fig.width = 10, fig.height = 5}
+Summarize null model metrics:
+
+```{r}
+null.data.sum.s <- nulls.s |> 
+  select(type, net_id, iter, all_of(metrics.of.interest)) |> 
+  pivot_longer(cols = -c(1:3), names_to = "metric", values_to = "value") |> 
+  group_by(type, net_id, metric) |> 
+  summarise(mean_nulls = mean(value),
+            sd_nulls = sd(value)) |> 
+  mutate(null = "Swap")
+
+null.data.sum.p <- nulls.p |> 
+  select(type, net_id, iter, all_of(metrics.of.interest)) |> 
+  pivot_longer(cols = -c(1:3), names_to = "metric", values_to = "value") |> 
+  group_by(type, net_id, metric) |> 
+  summarise(mean_nulls = mean(value),
+            sd_nulls = sd(value)) |> 
+  mutate(null = "Patefield")
+
+null.data.sum <- full_join(null.data.sum.s, null.data.sum.p)|> 
+  left_join(obs.metrics.long) |> 
+  mutate(z_score = (value_obs - mean_nulls) / sd_nulls,
+         diff_nulls = (value_obs - mean_nulls))
+
 null.data.sum.selec <- null.data.sum |> 
   mutate(null_metric = paste(metric, null)) |> 
-  filter(null_metric %in% c("connectance Patefield", "M Vazquez", "assortativity Vazquez",
-                            "centralization.w Vazquez", "interaction.evenness Vazquez", "weighted.NODF Vazquez")) |> 
+  filter(null_metric %in% c("connectance Patefield", "M Swap", "assortativity Swap",
+                            "centralization.w Swap", "interaction.evenness Swap", "weighted.NODF Swap")) |> 
   mutate(metric = as.factor(recode(metric, 
                          "M" = "Modularity",
                          "assortativity" = "Assortativity",
@@ -155,8 +171,14 @@ null.data.sum.selec <- null.data.sum |>
                          "connectance" = "Connectance",
                          "interaction.evenness" = "Interaction evenness",
                          "weighted.NODF" = "Weighted NODF")) |> 
-                    fct_relevel("Connectance", "Weighted NODF", "Modularity", "Interaction evenness", "Assortativity", "Centralization"))
-  
+                    fct_relevel("Connectance", "Weighted NODF", "Modularity", "Interaction evenness",
+                                "Assortativity", "Centralization"))
+```
+
+
+Plot to compare network types:
+
+```{r fig.width = 10, fig.height = 5}
 p1 <- null.data.sum.selec |> 
   ggplot(aes(x = value_obs, fill = type_long, color = type_long)) + 
   geom_density(alpha = 0.4) + 
@@ -189,7 +211,7 @@ p2 <- null.data.sum.selec |>
   labs(y = NULL, x = NULL, title = "B. Deviation from null models")
 
 p1 / p2 + plot_layout(guides = "collect") + 
-  plot_annotation(caption = 'Deviation from null model is in respect to Vazquez algorithm,\n except connectance which is in respect to Patefield algorithm.')
+  plot_annotation(caption = 'Deviation from null model is in respect to Swap algorithm,\n except connectance which is in respect to Patefield algorithm.')
 
 #ggsave(here("figs/Fig_2_net_level_comparison.pdf"), width = 10, height = 5)
 
@@ -222,80 +244,69 @@ sum.tb
 Plot comparing metrics by network one by one:
 
 ```{r, fig.height=6, fig.width=9} 
-plot.null <- function(null_type, metric) {
-  null.metrics.long |>
-    filter(null == {{null_type}}) |> 
-    filter(metric == {{metric}}) |>
+plot.null <- function(metric) {
+  null.metrics.long.selec |>
+    mutate(type = recode(type, "ind" = "individual-based networks", "sp" = "species-based networks")) |> 
+    # filter(null == {{null_type}}) |> 
+    filter(metric2 == {{metric}}) |>
     ggplot(aes(x = as.factor(net_n), y = value)) +
-    geom_boxplot(outliers = FALSE) +
+    ggdist::stat_pointinterval(.width = 0.95, point_size = 0.8, linewidth = 0.5, color = "grey30") + 
+    #geom_boxplot(outliers = FALSE) +
     geom_point(aes(x = as.factor(net_n), y = value_obs), color = "goldenrod", pch =8, size = 2,
-               data = obs.metrics.long |> filter(metric == {{metric}})) +
-    theme_bw() + 
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.75)) + 
-    facet_wrap(~type, scales = "free", ncol = 1) + 
-    labs(title = paste0({{metric}}, " (",{{null_type}}, ")"), x = "net code", y = NULL)
+               data = obs.metrics.long |> filter(metric2 == {{metric}}) |>
+                 mutate(type = recode(type, "ind" = "individual-based networks", 
+                                      "sp" = "species-based networks"))) +
+    theme_minimal() + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.75), axis.title = element_blank(), 
+          panel.background = element_rect(colour = "grey50", fill = NA)) + 
+    facet_wrap(~type, scales = "free", ncol = 1) 
+    #labs(title = paste0({{metric}}, " (",{{null_type}}, ")"), x = "net code", y = NULL)
 }
 
-plot.null("Patefield", "connectance")
-plot.null("Vazquez","weighted.NODF")
-plot.null("Vazquez","M")
-plot.null("Vazquez","interaction.evenness")
-plot.null("Vazquez","assortativity")
-plot.null("Vazquez","centralization.w")
+ps1 <- plot.null("Connectance") + labs(title = "A. Connectance")
+ps2 <- plot.null("Weighted NODF") + labs(title = "B. Weigthed NODF")
+ps3 <- plot.null("Modularity") + labs(title = "C. Modularity")
+ps4 <- plot.null("Interaction evenness") + labs(title = "D. Interaction evenness")
+ps5 <- plot.null("Assortativity") + labs(title = "E. Assortativity")
+ps6 <- plot.null("Centralization") + labs(title = "F. Centralization")
 
+ps1 / ps2 
+ps3 / ps4
+ps5 / ps6
+
+ggsave(filename = here("figs/Fig_SM_A.png"), plot = ps1, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SM_B.png"), plot = ps2, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SM_C.png"), plot = ps3, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SM_D.png"), plot = ps4, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SM_E.png"), plot = ps5, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SM_F.png"), plot = ps6, width = 7, height = 5)
 ```
 
 Alternative fig 2:
 
 ```{r fig.height=6, fig.width=9}
-tmp <- null.metrics.long |> 
-  mutate(basis_of_value = "null") |> 
-  mutate(null_metric = paste(metric, null)) |> 
-  filter(null_metric %in% c("connectance Patefield", "M Vazquez", "assortativity Vazquez",                         
-                            "centralization.w Vazquez", "interaction.evenness Vazquez", "weighted.NODF Vazquez"))
-
 p3 <- obs.metrics.long |>
   rename(value = value_obs) |> 
   mutate(basis_of_value = "obs") |> 
-  full_join(tmp)  |> 
-  mutate(metric = as.factor(recode(metric, 
-                         "M" = "Modularity",
-                         "assortativity" = "Assortativity",
-                         "centralization.w" = "Centralization",
-                         "connectance" = "Connectance",
-                         "interaction.evenness" = "Interaction evenness",
-                         "weighted.NODF" = "Weighted NODF")) |> 
-                    fct_relevel("Connectance", "Weighted NODF", "Modularity", 
-                                "Interaction evenness", "Assortativity", "Centralization"),
-         basis_of_value = fct_relevel(basis_of_value, c("obs", "null")))  |> 
+  full_join(null.metrics.long.selec)  |> 
+  mutate(basis_of_value = if_else(is.na(basis_of_value), "null", basis_of_value)) |> 
+  mutate(basis_of_value = fct_relevel(basis_of_value, c("obs", "null")))  |> 
   ggplot(aes(x = type, y = value, color = basis_of_value, fill = basis_of_value)) +
   geom_boxplot(outliers = FALSE, alpha = 0.4) +
   scale_color_manual(values = c("goldenrod", "grey40")) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
-  facet_wrap(~metric, scales = "free", nrow = 1) +
+  facet_wrap(~metric2, scales = "free", nrow = 1) +
   labs(x = NULL, y = NULL)
 
-p4 <- null.metrics.long |> 
+p4 <- null.metrics.long.selec |> 
   mutate(basis_of_value = "difference\n(obs - null)") |> 
-  mutate(null_metric = paste(metric, null)) |> 
-  filter(null_metric %in% c("connectance Patefield", "M Vazquez", "assortativity Vazquez",                         
-                            "centralization.w Vazquez", "interaction.evenness Vazquez", "weighted.NODF Vazquez")) |>
   left_join(obs.metrics.long) |> 
   mutate(diff = (value_obs - value)) |> 
-  mutate(metric = as.factor(recode(metric, 
-                         "M" = "Modularity",
-                         "assortativity" = "Assortativity",
-                         "centralization.w" = "Centralization",
-                         "connectance" = "Connectance",
-                         "interaction.evenness" = "Interaction evenness",
-                         "weighted.NODF" = "Weighted NODF")) |> 
-                    fct_relevel("Connectance", "Weighted NODF", "Modularity", 
-                                "Interaction evenness", "Assortativity", "Centralization")) |> 
   ggplot(aes(x = type, y = diff, color = basis_of_value, fill = basis_of_value)) +
   geom_boxplot(outliers = FALSE, alpha = 0.4) +
   # scale_color_manual(values = "#009999") + 
   # scale_fill_manual(values = "#009999") +
-  facet_wrap(~metric, scales = "free", nrow = 1) +
+  facet_wrap(~metric2, scales = "free", nrow = 1) +
   labs(x = NULL, y = NULL)
 
 p3 / p4 + plot_layout(guides = "collect")
@@ -307,46 +318,40 @@ p3 / p4 + plot_layout(guides = "collect")
 p3 <- obs.metrics.long |>
   rename(value = value_obs) |> 
   mutate(basis_of_value = "obs") |> 
-  mutate(metric = as.factor(recode(metric, 
-                         "M" = "Modularity",
-                         "assortativity" = "Assortativity",
-                         "centralization.w" = "Centralization",
-                         "connectance" = "Connectance",
-                         "interaction.evenness" = "Interaction evenness",
-                         "weighted.NODF" = "Weighted NODF")) |> 
-                    fct_relevel("Connectance", "Weighted NODF", "Modularity", 
-                                "Interaction evenness", "Assortativity", "Centralization"))  |> 
-  ggplot(aes(x = type, y = value, color = type, fill = type)) +
-  geom_boxplot(outliers = FALSE, alpha = 0.4) + # color = "goldenrod", fill =  "goldenrod"
+  mutate(type = recode(type, "ind" = "Ind", "sp" = "Sp")) |> 
+  ggplot(aes(x = type, y = value)) +
+  ggdist::stat_pointinterval(aes(color = type, fill = type), alpha = 0.6, .width = c(0.66, 0.95)) +
+  #geom_boxplot(outliers = FALSE, alpha = 0.4) + # color = "goldenrod", fill =  "goldenrod"
   scale_color_manual(values = c("goldenrod", "grey40")) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
-  facet_wrap(~metric, scales = "free", nrow = 1) +
-  labs(x = NULL, y = NULL, subtitle = "Observed values")
+  facet_wrap(~metric2, scales = "free", nrow = 1) +
+  labs(x = NULL, y = NULL, subtitle = "A. Observed values") + 
+  theme(legend.position = "none", strip.text = element_text(size = 7))
 
-p4 <- null.metrics.long |> 
+model_labels <- data.frame(metric2 = unique(null.metrics.long.selec$metric2),
+         label = c("", "*", "*", "", "*", "*")) |> 
+  mutate(metric2 = metric2 |> fct_relevel("Connectance", "Weighted NODF", "Modularity",
+                                          "Interaction evenness",
+                                          "Assortativity", "Centralization"))
+
+p4 <- null.metrics.long.selec |> 
   mutate(basis_of_value = "difference\n(obs - null)") |> 
-  mutate(null_metric = paste(metric, null)) |> 
-  filter(null_metric %in% c("connectance Patefield", "M Vazquez", "assortativity Vazquez",                         
-                            "centralization.w Vazquez", "interaction.evenness Vazquez", "weighted.NODF Vazquez")) |>
   left_join(obs.metrics.long) |> 
   mutate(diff = (value_obs - value)) |> 
-  mutate(metric = as.factor(recode(metric, 
-                         "M" = "Modularity",
-                         "assortativity" = "Assortativity",
-                         "centralization.w" = "Centralization",
-                         "connectance" = "Connectance",
-                         "interaction.evenness" = "Interaction evenness",
-                         "weighted.NODF" = "Weighted NODF")) |> 
-                    fct_relevel("Connectance", "Weighted NODF", "Modularity", 
-                                "Interaction evenness", "Assortativity", "Centralization")) |> 
-  ggplot(aes(x = type, y = diff, color = type, fill = type)) +
-  geom_boxplot(outliers = FALSE, alpha = 0.4) +# color = "grey40", fill =  "grey40"
+  mutate(type = recode(type, "ind" = "Ind", "sp" = "Sp")) |> 
+  ggplot(aes(x = type, y = diff)) +
+  ggdist::stat_pointinterval(aes(color = type, fill = type), alpha = 0.6, .width = c(0.66, 0.95)) +
+  #geom_boxplot(aes(color = type, fill = type), outliers = FALSE, alpha = 0.4) +# color = "grey40", fill =  "grey40"
   scale_color_manual(values = c("goldenrod", "grey40")) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
-  facet_wrap(~metric, scales = "free", nrow = 1) +
-  labs(x = NULL, y = NULL, subtitle = "Difference from random expectation")
+  facet_wrap(~metric2, scales = "free", nrow = 1) +
+  labs(x = NULL, y = NULL, subtitle = "B. Deviation from random expectation")+ 
+  theme(legend.position = "none", strip.text = element_text(size = 7)) +
+  geom_text(x = 1.5, y = c(0, 0.28, 0.01, 0, 0.21, -0.03), aes(label = label), data = model_labels)
 
 p3 / p4 + plot_layout(guides = "collect")
+
+ggsave(here("figs/Fig_2_net_level_comparison.png"), width = 8, height = 5)
 ```
 
 3rd alternative to fig:
@@ -354,45 +359,24 @@ p3 / p4 + plot_layout(guides = "collect")
 ```{r fig.height=6, fig.width=9}
 p5 <- obs.metrics.long |> 
   mutate(basis_of_value = "observed") |> 
-  mutate(metric = as.factor(recode(metric, 
-                         "M" = "Modularity",
-                         "assortativity" = "Assortativity",
-                         "centralization.w" = "Centralization",
-                         "connectance" = "Connectance",
-                         "interaction.evenness" = "Interaction evenness",
-                         "weighted.NODF" = "Weighted NODF")) |> 
-                    fct_relevel("Connectance", "Weighted NODF", "Modularity", 
-                                "Interaction evenness", "Assortativity", "Centralization"))  |> 
   ggplot(aes(y = type, x = value_obs, color = type, fill = type)) +
   geom_boxplot(outliers = FALSE, alpha = 0.4) +
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   scale_color_manual(values = c("goldenrod", "grey40")) +
-  facet_wrap(~metric, scales = "free", nrow = 1) +
+  facet_wrap(~metric2, scales = "free", nrow = 1) +
   labs(x = NULL, y = NULL) + 
   theme(axis.ticks.y = element_blank(),
         axis.text.y = element_blank())
 
-p6 <- null.metrics.long |> 
+p6 <- null.metrics.long.selec |> 
   mutate(basis_of_value = "difference\n(obs - null)") |> 
-  mutate(null_metric = paste(metric, null)) |> 
-  filter(null_metric %in% c("connectance Patefield", "M Vazquez", "assortativity Vazquez",                         
-                            "centralization.w Vazquez", "interaction.evenness Vazquez", "weighted.NODF Vazquez")) |>
   left_join(obs.metrics.long) |> 
   mutate(diff = (value_obs - value)) |> 
-  mutate(metric = as.factor(recode(metric, 
-                         "M" = "Modularity",
-                         "assortativity" = "Assortativity",
-                         "centralization.w" = "Centralization",
-                         "connectance" = "Connectance",
-                         "interaction.evenness" = "Interaction evenness",
-                         "weighted.NODF" = "Weighted NODF")) |> 
-                    fct_relevel("Connectance", "Weighted NODF", "Modularity", 
-                                "Interaction evenness", "Assortativity", "Centralization")) |> 
   ggplot(aes(y = type, x = diff, color = type, fill = type)) +
   geom_boxplot(outliers = FALSE, alpha = 0.4) +
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   scale_color_manual(values = c("goldenrod", "grey40")) +
-  facet_wrap(~metric, scales = "free", nrow = 1) +
+  facet_wrap(~metric2, scales = "free", nrow = 1) +
   labs(x = NULL, y = NULL) + 
   theme(axis.ticks.y = element_blank(),
         axis.text.y = element_blank())
@@ -400,41 +384,38 @@ p6 <- null.metrics.long |>
 (p1 / p5 / p2 / p6) + plot_layout(heights = c(4,1,4,1), guides = "collect")
 ```
 
-Model comparisions:
+Model comparisons:
 
 ```{r}
 library(glmmTMB)
 library(DHARMa)
 
-tmp2 <- null.metrics.long |> 
+tmp <- null.metrics.long.selec |> 
   mutate(basis_of_value = "difference\n(obs - null)") |> 
-  mutate(null_metric = paste(metric, null)) |> 
-  filter(null_metric %in% c("connectance Patefield", "M Vazquez", "assortativity Vazquez",                         
-                            "centralization.w Vazquez", "interaction.evenness Vazquez", "weighted.NODF Vazquez")) |>
   left_join(obs.metrics.long) |> 
   mutate(diff = (value_obs - value))
 
-m1 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp2 |> filter(metric == "connectance"))
+m1 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp |> filter(metric == "connectance"))
 summary(m1)
 simulateResiduals(m1, plot = T)
 
-m2 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp2 |> filter(metric == "weighted.NODF"))
+m2 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp |> filter(metric == "weighted.NODF"))
 summary(m2)
 simulateResiduals(m2, plot = T)
 
-m3 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp2 |> filter(metric == "M"))
+m3 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp |> filter(metric == "M"))
 summary(m3)
 simulateResiduals(m3, plot = T)
 
-m4 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp2 |> filter(metric == "interaction.evenness"))
+m4 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp |> filter(metric == "interaction.evenness"))
 summary(m4)
 simulateResiduals(m4, plot = T)
 
-m5 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp2 |> filter(metric == "assortativity"))
+m5 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp |> filter(metric == "assortativity"))
 summary(m5)
 simulateResiduals(m5, plot = T)
 
-m6 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp2 |> filter(metric == "centralization.w"))
+m6 <- glmmTMB::glmmTMB(diff ~ type + (1|net_code), data = tmp |> filter(metric == "centralization.w"))
 summary(m6)
 simulateResiduals(m6, plot = T)
 ```
