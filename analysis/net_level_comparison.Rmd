@@ -146,12 +146,12 @@ ps4 <- plot.null("Interaction evenness") + labs(title = "D. Interaction evenness
 ps5 <- plot.null("Assortativity") + labs(title = "E. Assortativity")
 ps6 <- plot.null("Centralization") + labs(title = "F. Centralization")
 
-# ggsave(filename = here("figs/Fig_SM_A.png"), plot = ps1, width = 7, height = 5)
-# ggsave(filename = here("figs/Fig_SM_B.png"), plot = ps2, width = 7, height = 5)
-# ggsave(filename = here("figs/Fig_SM_C.png"), plot = ps3, width = 7, height = 5)
-# ggsave(filename = here("figs/Fig_SM_D.png"), plot = ps4, width = 7, height = 5)
-# ggsave(filename = here("figs/Fig_SM_E.png"), plot = ps5, width = 7, height = 5)
-# ggsave(filename = here("figs/Fig_SM_F.png"), plot = ps6, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SX_null_comparison_A.png"), plot = ps1, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SX_null_comparison_B.png"), plot = ps2, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SX_null_comparison_C.png"), plot = ps3, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SX_null_comparison_D.png"), plot = ps4, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SX_null_comparison_E.png"), plot = ps5, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_SX_null_comparison_F.png"), plot = ps6, width = 7, height = 5)
 ```
 
 Figure 2 (scale comparison):
@@ -186,7 +186,7 @@ p4 <- null.metrics.long |>
 
 p3 / p4 + plot_layout(guides = "collect")
 
-#ggsave(here("figs/Fig_2_net_level_comparison.png"), width = 7, height = 4)
+ggsave(here("figs/Fig_2_net_level_comparison.pdf"), width = 7, height = 4)
 ```
 
 
@@ -305,7 +305,7 @@ ggplot(obs.metrics.long2, aes(x = number.of.species.HL + number.of.species.LL,
   theme(panel.background = element_rect(colour = "grey50", fill = NA)) +
   labs(x = "Number of network nodes", color = NULL, y = NULL)
 
-ggsave(here("Figs/SM_corr.png"), width = 9, height = 5)
+ggsave(here("Figs/Fig_SX_metrics_corr.png"), width = 9, height = 5)
 ```
 
 
