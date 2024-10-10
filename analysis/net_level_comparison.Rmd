@@ -125,7 +125,8 @@ plot.null <- function(metric) {
     # filter(null == {{null_type}}) |> 
     filter(metric2 == {{metric}}) |>
     ggplot(aes(x = as.factor(net_n), y = value)) +
-    ggdist::stat_pointinterval(.width = 0.95, point_size = 0.8, linewidth = 0.5, color = "grey30") + 
+    ggdist::stat_pointinterval(point_interval = "mean_qi", .width = 0.95, 
+                               point_size = 0.8, linewidth = 0.5, color = "grey30") + 
     geom_point(aes(x = as.factor(net_n), y = value_obs), color = "goldenrod", pch =8, size = 2,
                data = obs.metrics.long |> filter(metric2 == {{metric}}) |>
                  mutate(type = recode(type, "ind" = "individual-based networks", 
