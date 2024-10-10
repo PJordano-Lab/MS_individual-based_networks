@@ -95,7 +95,6 @@ plot.fun <- function(metric) {
   null.metrics.long |>
     filter(metric == {{metric}}) |>
   ggplot(aes(x = value, fill = type)) +
-  #geom_density(alpha = 0.5) +
   geom_histogram() +
   geom_abline() +
   scale_fill_manual(values = c("grey20", "grey80")) +
@@ -107,12 +106,12 @@ plot.fun <- function(metric) {
              data = net.level)
   }
 
-plot.fun("connectance")
-plot.fun("weighted.NODF")
-plot.fun("interaction.evenness")
-plot.fun("M")
-plot.fun("assortativity")
-plot.fun("centralization.w")
+# plot.fun("connectance")
+# plot.fun("weighted.NODF")
+# plot.fun("interaction.evenness")
+# plot.fun("M")
+# plot.fun("assortativity")
+# plot.fun("centralization.w")
 ```
 
 Plot comparing metrics by network one by one:
@@ -127,7 +126,6 @@ plot.null <- function(metric) {
     filter(metric2 == {{metric}}) |>
     ggplot(aes(x = as.factor(net_n), y = value)) +
     ggdist::stat_pointinterval(.width = 0.95, point_size = 0.8, linewidth = 0.5, color = "grey30") + 
-    #geom_boxplot(outliers = FALSE) +
     geom_point(aes(x = as.factor(net_n), y = value_obs), color = "goldenrod", pch =8, size = 2,
                data = obs.metrics.long |> filter(metric2 == {{metric}}) |>
                  mutate(type = recode(type, "ind" = "individual-based networks", 
@@ -136,7 +134,6 @@ plot.null <- function(metric) {
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.75), axis.title = element_blank(), 
           panel.background = element_rect(colour = "grey50", fill = NA)) + 
     facet_wrap(~type, scales = "free", ncol = 1) 
-    #labs(title = paste0({{metric}}, " (",{{null_type}}, ")"), x = "net code", y = NULL)
 }
 
 ps1 <- plot.null("Connectance") + labs(title = "A. Connectance")
@@ -162,13 +159,13 @@ p3 <- obs.metrics.long |>
   mutate(basis_of_value = "obs") |> 
   mutate(type = recode(type, "ind" = "Ind", "sp" = "Sp")) |> 
   ggplot(aes(x = type, y = value)) +
-  ggdist::stat_pointinterval(aes(color = type, fill = type), alpha = 0.6, .width = c(0.66, 0.95)) +
-  #geom_boxplot(outliers = FALSE, alpha = 0.4) + # color = "goldenrod", fill =  "goldenrod"
+  ggdist::stat_pointinterval(aes(color = type, fill = type), 
+                             point_interval = "mean_qi", alpha = 0.6, .width = c(0.66, 0.95)) +
   scale_color_manual(values = c("goldenrod", "grey40")) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   facet_wrap(~metric2, scales = "free", nrow = 1) +
   labs(x = NULL, y = NULL, subtitle = "A. Observed values") + 
-  theme(legend.position = "none", strip.text = element_text(size = 7))
+  theme(legend.position = "none", strip.text = element_text(size = 6))
 
 p4 <- null.metrics.long |> 
   mutate(basis_of_value = "difference\n(obs - null)") |> 
@@ -176,13 +173,13 @@ p4 <- null.metrics.long |>
   mutate(diff = (value_obs - value)) |> 
   mutate(type = recode(type, "ind" = "Ind", "sp" = "Sp")) |> 
   ggplot(aes(x = type, y = diff)) +
-  ggdist::stat_pointinterval(aes(color = type, fill = type), alpha = 0.6, .width = c(0.66, 0.95)) +
-  #geom_boxplot(aes(color = type, fill = type), outliers = FALSE, alpha = 0.4) +# color = "grey40", fill =  "grey40"
+  ggdist::stat_pointinterval(aes(color = type, fill = type),
+                             point_interval = "mean_qi", alpha = 0.6, .width = c(0.66, 0.95)) +
   scale_color_manual(values = c("goldenrod", "grey40")) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   facet_wrap(~metric2, scales = "free", nrow = 1) +
   labs(x = NULL, y = NULL, subtitle = "B. Deviation from random expectation")+ 
-  theme(legend.position = "none", strip.text = element_text(size = 7)) 
+  theme(legend.position = "none", strip.text = element_text(size = 6)) 
 
 p3 / p4 + plot_layout(guides = "collect")
 
@@ -224,7 +221,6 @@ p1 <- null.data.sum |>
   facet_wrap(~metric, scales = "free", nrow = 1) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   scale_color_manual(values = c("goldenrod", "grey40")) +
-  #scale_fill_manual(values = c("grey40", "#2F8AC4")) +
   theme(panel.background = element_rect(colour = "black"),
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
@@ -239,12 +235,9 @@ p2 <- null.data.sum |>
   facet_wrap(~metric, scales = "free", nrow = 1) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   scale_color_manual(values = c("goldenrod", "grey40")) +
-  #scale_fill_manual(values = c("grey40", "#2F8AC4")) +
   theme(legend.position = "none",
         axis.text.y = element_blank(), 
         axis.ticks.y = element_blank(),
-        # panel.background = element_rect(colour = "black"), 
-        # strip.background = element_rect(colour = "white"),
         panel.grid.minor = element_blank(),
         panel.grid.major.y = element_blank()) + 
   labs(y = NULL, x = NULL, title = "B. Deviation from null models")
