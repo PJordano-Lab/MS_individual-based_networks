@@ -108,7 +108,7 @@ frug.accum.ints %>%
        y = "Contribution to total interactions")
   #caption = "Black contour represent frugivore species that aggregated perform >50% of interactions"
 
-ggsave(here("figs/Fig_S4_frugivore_ints_accumulated.pdf"), width = 8, height = 9)
+ggsave(here("figs/Fig_S6_frugivore_ints_accumulated.pdf"), width = 8, height = 9)
 ```
 
 

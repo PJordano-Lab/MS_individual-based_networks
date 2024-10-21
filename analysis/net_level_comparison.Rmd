@@ -144,12 +144,12 @@ ps4 <- plot.null("Interaction evenness") + labs(title = "D. Interaction evenness
 ps5 <- plot.null("Assortativity") + labs(title = "E. Assortativity")
 ps6 <- plot.null("Centralization") + labs(title = "F. Centralization")
 
-ggsave(filename = here("figs/Fig_SX_null_comparison_A.png"), plot = ps1, width = 7, height = 5)
-ggsave(filename = here("figs/Fig_SX_null_comparison_B.png"), plot = ps2, width = 7, height = 5)
-ggsave(filename = here("figs/Fig_SX_null_comparison_C.png"), plot = ps3, width = 7, height = 5)
-ggsave(filename = here("figs/Fig_SX_null_comparison_D.png"), plot = ps4, width = 7, height = 5)
-ggsave(filename = here("figs/Fig_SX_null_comparison_E.png"), plot = ps5, width = 7, height = 5)
-ggsave(filename = here("figs/Fig_SX_null_comparison_F.png"), plot = ps6, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_S4_null_comparison_A.png"), plot = ps1, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_S4_null_comparison_B.png"), plot = ps2, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_S4_null_comparison_C.png"), plot = ps3, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_S4_null_comparison_D.png"), plot = ps4, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_S4_null_comparison_E.png"), plot = ps5, width = 7, height = 5)
+ggsave(filename = here("figs/Fig_S4_null_comparison_F.png"), plot = ps6, width = 7, height = 5)
 ```
 
 Figure 2 (scale comparison):
@@ -161,7 +161,7 @@ p3 <- obs.metrics.long |>
   mutate(type = recode(type, "ind" = "Ind", "sp" = "Sp")) |> 
   ggplot(aes(x = type, y = value)) +
   ggdist::stat_pointinterval(aes(color = type, fill = type), 
-                             point_interval = "mean_qi", alpha = 0.6, .width = c(0.66, 0.95)) +
+                             point_interval = "mean_qi", alpha = 0.6, .width = c(0.6, 0.9)) +
   scale_color_manual(values = c("goldenrod", "grey40")) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   facet_wrap(~metric2, scales = "free", nrow = 1) +
@@ -175,7 +175,7 @@ p4 <- null.metrics.long |>
   mutate(type = recode(type, "ind" = "Ind", "sp" = "Sp")) |> 
   ggplot(aes(x = type, y = diff)) +
   ggdist::stat_pointinterval(aes(color = type, fill = type),
-                             point_interval = "mean_qi", alpha = 0.6, .width = c(0.66, 0.95)) +
+                             point_interval = "mean_qi", alpha = 0.6, .width = c(0.6, 0.9)) +
   scale_color_manual(values = c("goldenrod", "grey40")) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   facet_wrap(~metric2, scales = "free", nrow = 1) +
@@ -299,7 +299,7 @@ ggplot(obs.metrics.long2, aes(x = number.of.species.HL + number.of.species.LL,
   theme(panel.background = element_rect(colour = "grey50", fill = NA)) +
   labs(x = "Number of network nodes", color = NULL, y = NULL)
 
-ggsave(here("Figs/Fig_SX_metrics_corr.png"), width = 9, height = 5)
+ggsave(here("Figs/Fig_S3_metrics_corr.png"), width = 9, height = 5)
 ```
 
 

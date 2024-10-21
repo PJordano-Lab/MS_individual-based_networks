@@ -320,7 +320,7 @@ p.clusters.bio <- ggplot(net.cluster.summary,
 
 p.pca.bio.clust / p.clusters.bio + plot_layout(heights = c(6,2))
 
-ggsave(here("figs/Fig_S7_PCA_clusters_bioregion.pdf"), width = 9, height = 9)
+ggsave(here("figs/Fig_S9_PCA_clusters_bioregion.pdf"), width = 9, height = 9)
 ```
 
 
@@ -374,7 +374,7 @@ pca.full.coords |>
                arrow = arrow(length = unit(0.05, "inches")), color = "gray30") +
   facet_wrap(~fct_reorder(plant_sp, plot_rank2), ncol = 5)
 
-ggsave(here("figs/Fig_S6_PCA_posteriors_plants.png"), height = 10, width = 8)
+ggsave(here("figs/Fig_S8_PCA_posteriors_plants.png"), height = 10, width = 8)
 ```
 
 

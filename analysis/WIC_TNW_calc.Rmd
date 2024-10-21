@@ -303,7 +303,7 @@ ind.spec2 |>
   scale_y_log10() + scale_x_log10() +
   labs(y = "WIC", x  = "TNW", size = "No. frugivores", color = "Region", fill = "Region") 
 
-ggsave(here("figs/Fig_S3_WIC_vs_TNW_log.pdf"), width = 7, height = 5)
+ggsave(here("figs/Fig_S5_WIC_vs_TNW_log.pdf"), width = 7, height = 5)
 ```
 
 

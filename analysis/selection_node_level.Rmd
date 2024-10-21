@@ -149,7 +149,7 @@ p.mat <- cor_pmat(df[-c(1,7,8)])
 ggcorrplot(corr_matrix, type = "lower", show.diag = F,
            hc.order = F, lab = T)
 
-ggsave(here("figs/Fig_S5_cor_node_metrics.png"), width = 6, height = 6)
+ggsave(here("figs/Fig_S7_cor_node_metrics.png"), width = 6, height = 6)
 ```
 
 
