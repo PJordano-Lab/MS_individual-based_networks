@@ -179,7 +179,7 @@ p4 <- null.metrics.long |>
   scale_color_manual(values = c("goldenrod", "grey40")) + 
   scale_fill_manual(values = c("goldenrod", "grey40")) +
   facet_wrap(~metric2, scales = "free", nrow = 1) +
-  labs(x = NULL, y = NULL, subtitle = "B. Deviation from random expectation")+ 
+  labs(x = NULL, y = NULL, subtitle = "B. Deviation from null models")+ 
   theme(legend.position = "none", strip.text = element_text(size = 6)) 
 
 p3 / p4 + plot_layout(guides = "collect")
