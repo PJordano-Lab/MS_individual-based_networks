@@ -171,3 +171,46 @@ net.level[, c("type", metrics.of.interest)] %>%
 ```
 
 
+
+### Compare net-level metrics for ind-based nets when using or not Bayes approach:
+
+Load metrics from posteriors data:
+
+```{r}
+files <- list.files(here("data/net_metrics_posteriors/"))
+
+#select only those files with node metrics (not net metrics)
+files_nets <- files[grep("net", files)]
+
+df.metrics <- data.frame()
+
+for (i in 1:length(files_nets)) {
+  
+  df <- readRDS(here(paste0("data/net_metrics_posteriors/", files_nets[i])))
+  df.metrics <- rbind(df.metrics, df)
+  
+}
+
+net.level.post <- df.metrics |> 
+  rename("Modularity" = "M") |> 
+  rename("Assortativity" = "assortativity") |> 
+  rename("Centralization" = "centralization.w") |> 
+  rename("Connectance" = "connectance") |> 
+  rename("Interaction_evenness" = "interaction.evenness") |> 
+  rename("Weighted_NODF" = "weighted.NODF") |> 
+  rename("Network_size" = "net_size")
+
+glimpse(net.level.post)
+
+# no. of networks:
+unique(df.metrics$net_id)
+length(unique(df.metrics$net_id))
+```
+
+```{r}
+summarytools::dfSummary(net.level[, metrics.of.interest])
+
+summarytools::dfSummary(net.level.post[, metrics.of.interest])
+```
+
+
